@@ -22,10 +22,11 @@ Open [http://localhost:3000](http://localhost:3000).
 Available only in development (`NODE_ENV=development`):
 
 - **URL flag:** `http://localhost:3000?debug=figma` — enables Figma debug overlay
-- **Design Panel:** bottom-right button — typography, spacing, colors, motion toggles
-- **Overlay:** hover any element → highlight + tooltip with nodeId, name, manifest path
-- **Click element:** copies `@figma node:...` correction snippet to clipboard
-- **Copy tokens:** exports current CSS var values as JSON for chat handoff
+- **Design Panel:** bottom-right button — Global Tokens + Selected Node tabs
+- **Overlay:** hover any element → blue highlight + tooltip; click → pin (orange ring)
+- **Live editing:** pinned node properties update DOM instantly; overrides persist in localStorage
+- **Copy snippet / Copy all overrides:** export `@figma` commands for chat handoff
+- **Copy tokens:** exports current CSS var values as JSON for global changes
 
 ## Correction workflow
 
@@ -37,7 +38,7 @@ Use these phrases in Cursor chat:
 @figma re-sync node:88:174
 ```
 
-See [docs/figma/correction-guide.md](docs/figma/correction-guide.md) for details.
+See [docs/figma/correction-guide.md](docs/figma/correction-guide.md) for the full Live Debug workflow.
 
 ## Project structure
 
@@ -45,9 +46,10 @@ See [docs/figma/correction-guide.md](docs/figma/correction-guide.md) for details
 src/
 ├── app/                  # Next.js app shell
 ├── components/polis/     # Figma-faithful component tree
-├── components/dev/       # Debug overlay + adjustment panel
+├── components/dev/       # Debug overlay + adjustment panel + live inspector
+├── context/              # LiveDebugContext (dev only)
 ├── figma/                # manifest.ts + tokens.ts
-├── hooks/                # useDesignAdjustments
+├── hooks/                # useDesignAdjustments, useLiveNodeOverrides
 └── lib/gsap/             # useEntranceAnimation
 ```
 

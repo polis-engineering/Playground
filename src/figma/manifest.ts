@@ -315,3 +315,48 @@ export const manifestByNodeId = flattenManifest();
 export function getManifestPath(nodeId: string): string | undefined {
   return manifestByNodeId.get(nodeId)?.componentPath;
 }
+
+export function getManifestNode(nodeId: string): FigmaNodeManifest | undefined {
+  return manifestByNodeId.get(nodeId);
+}
+
+const TEXT_EDITABLE: (keyof CssPropertySnapshot)[] = [
+  "fontSize",
+  "lineHeight",
+  "letterSpacing",
+  "fontWeight",
+  "color",
+];
+
+const FRAME_EDITABLE: (keyof CssPropertySnapshot)[] = [
+  "gap",
+  "maxWidth",
+  "padding",
+];
+
+export function propertyToCssKey(property: string): string {
+  return property.replace(/([A-Z])/g, "-$1").toLowerCase();
+}
+
+export function getEditableProperties(
+  node: FigmaNodeManifest,
+): (keyof CssPropertySnapshot)[] {
+  if (node.type === "text") {
+    return TEXT_EDITABLE;
+  }
+
+  const frameProps = FRAME_EDITABLE.filter(
+    (prop) => node.cssProperties[prop] !== undefined,
+  );
+  const typographyProps = TEXT_EDITABLE.filter(
+    (prop) => node.cssProperties[prop] !== undefined,
+  );
+
+  return [...typographyProps, ...frameProps];
+}
+
+export function getAllManifestNodes(): FigmaNodeManifest[] {
+  return Array.from(manifestByNodeId.values()).sort((a, b) =>
+    a.nodeId.localeCompare(b.nodeId, undefined, { numeric: true }),
+  );
+}

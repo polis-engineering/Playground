@@ -45,7 +45,7 @@ function fromDefaults(): DesignAdjustments {
   };
 }
 
-function applyToDocument(adjustments: DesignAdjustments) {
+export function applyAdjustmentsToDocument(adjustments: DesignAdjustments) {
   const root = document.documentElement;
   const vars: [CssVarName, string][] = [
     [cssVarNames.fontSize, adjustments.fontSize],
@@ -93,7 +93,7 @@ export function useDesignAdjustments() {
   const [overlayEnabled, setOverlayEnabled] = useState(readInitialOverlayEnabled);
 
   useEffect(() => {
-    applyToDocument(adjustments);
+    applyAdjustmentsToDocument(adjustments);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(adjustments));
   }, [adjustments]);
 

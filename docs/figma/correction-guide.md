@@ -5,7 +5,19 @@
 1. Run dev server: `pnpm dev`
 2. Open `http://localhost:3000?debug=figma`
 3. Hover elements to see Figma node IDs
-4. Click an element to copy a correction snippet
+4. Click a node to pin it for live editing
+
+## Live Debug workflow
+
+1. Enable overlay via `?debug=figma` or the **Figma overlay** checkbox in Design Panel
+2. **Hover** a node → blue highlight + tooltip (nodeId, name, manifest path)
+3. **Click** a node → orange pinned ring; **Selected Node** tab opens automatically
+4. Edit properties in the panel → DOM updates instantly on every input/drag
+5. **Copy snippet** → paste `@figma` commands into chat for permanent fixes
+6. **Reset node** → clears inline styles for that node only
+7. **Escape** → clears pinned selection
+
+Live overrides persist in `localStorage` (`polis-node-overrides`) for preview across reloads. They are **preview-only** until an agent commits changes to source files.
 
 ## Chat templates
 
@@ -38,17 +50,28 @@ Agent should call Figma MCP `get_design_context` for desktop frame before editin
 | Action | Result |
 |--------|--------|
 | Hover `[data-node-id]` element | Blue highlight + tooltip with nodeId, name, manifest path |
-| Click highlighted element | Copies `@figma node:{id} property: inspect value:review` to clipboard |
-| Edit snippet | Replace `property` and `value` before pasting in chat |
+| Click highlighted element | Pins node (orange ring); opens Selected Node tab |
+| Escape | Clears pinned selection |
+| Edit in Selected Node tab | Live DOM update + snippet preview |
 
 ## Adjustment panel → chat handoff
 
-1. Open **Design Panel** (bottom-right)
-2. Tweak typography, spacing, colors, or motion
-3. Click **Copy tokens**
-4. Paste JSON into chat: "Apply these token values permanently"
+### Global tokens
 
-Example output:
+1. Open **Design Panel** (bottom-right)
+2. Use **Global Tokens** tab — tweak typography, spacing, colors, or motion
+3. Changes apply instantly while dragging sliders (`onInput`)
+4. Click **Copy tokens**
+5. Paste JSON into chat: "Apply these token values permanently"
+
+### Per-node overrides
+
+1. Pin a node via overlay click
+2. Edit properties in **Selected Node** tab
+3. Click **Copy snippet** for that node's overrides
+4. Or use **Copy all overrides** in Debug section for every pinned edit
+
+Example token output:
 
 ```json
 {
@@ -56,6 +79,13 @@ Example output:
   "lineHeight": "21.75px",
   "colorPrimary": "#202020"
 }
+```
+
+Example node override output:
+
+```
+@figma node:88:179 property:font-weight value:600
+@figma node:88:189 property:gap value:20px
 ```
 
 ## Agent workflow
@@ -68,6 +98,6 @@ Example output:
 
 ## Motion toggles
 
-- **Motion enabled:** toggles GSAP entrance animation
+- **Motion enabled:** toggles GSAP entrance animation (re-runs on change in dev)
 - **Stagger / Duration:** adjust entrance timing for testing
 - `prefers-reduced-motion: reduce` always disables GSAP regardless of toggle

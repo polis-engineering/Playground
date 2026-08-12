@@ -4,11 +4,17 @@ import { useRef } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { cssVarNames } from "@/figma/tokens";
+import { useLiveDebugOptional } from "@/context/LiveDebugContext";
 
 gsap.registerPlugin(useGSAP);
 
 export function useEntranceAnimation() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const liveDebug = useLiveDebugOptional();
+
+  const motionEnabled = liveDebug?.adjustments.motionEnabled;
+  const motionStagger = liveDebug?.adjustments.motionStagger;
+  const motionDuration = liveDebug?.adjustments.motionDuration;
 
   useGSAP(
     () => {
@@ -19,12 +25,12 @@ export function useEntranceAnimation() {
         "(prefers-reduced-motion: reduce)",
       ).matches;
 
-      const motionEnabled =
+      const enabled =
         getComputedStyle(document.documentElement).getPropertyValue(
           cssVarNames.motionEnabled,
         ) !== "0";
 
-      if (prefersReducedMotion || !motionEnabled) return;
+      if (prefersReducedMotion || !enabled) return;
 
       const stagger = parseFloat(
         getComputedStyle(document.documentElement).getPropertyValue(
@@ -52,7 +58,11 @@ export function useEntranceAnimation() {
         },
       );
     },
-    { scope: containerRef, dependencies: [] },
+    {
+      scope: containerRef,
+      dependencies: [motionEnabled, motionStagger, motionDuration],
+      revertOnUpdate: true,
+    },
   );
 
   return containerRef;

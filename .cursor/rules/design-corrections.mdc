@@ -25,9 +25,12 @@ Example: `Fix node 88:179 → font-weight → 600` maps to:
 
 ## Dev tools handoff
 
-- **Overlay:** hover `[data-node-id]` → shows nodeId, name, manifest path
-- **Click:** copies `@figma node:...` snippet to clipboard
-- **Panel:** live CSS var tweaks → "Copy tokens" → paste into chat
+- **Overlay:** hover `[data-node-id]` → blue highlight; click → pin node (orange ring)
+- **Selected Node tab:** live per-property edits with instant DOM preview
+- **Global Tokens tab:** live CSS var tweaks → "Copy tokens" → paste into chat
+- **Copy snippet / Copy all overrides:** export `@figma` commands from live edits
+
+Live overrides in `localStorage` (`polis-node-overrides`) are **preview-only** until committed to source files by the agent.
 
 ## Token updates
 
