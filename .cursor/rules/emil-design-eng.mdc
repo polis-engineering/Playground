@@ -1,0 +1,25 @@
+---
+description: Points agent to Emil Kowalski design engineering skill for polish and motion
+globs: src/components/**,src/lib/gsap/**
+---
+
+# Emil Design Engineering
+
+For UI polish, animation decisions, and interaction details, read and follow:
+
+`.cursor/skills/emil-design-eng/SKILL.md`
+
+## When to invoke
+
+- Adding or changing motion (entrance, hover, transitions)
+- Reviewing component feel and micro-interactions
+- Choosing between CSS vs GSAP for an interaction
+- Typography, spacing, or color refinement beyond Figma spec
+
+## Key principles (summary)
+
+- Unseen details compound — polish what users feel, not just see
+- CSS for interruptible UI (hovers, toggles); GSAP for orchestrated entrance
+- Respect `prefers-reduced-motion`
+- No `transition: all` — specify exact properties
+- Ease-out for elements entering; ease-in for elements exiting

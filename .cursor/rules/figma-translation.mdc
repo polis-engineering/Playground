@@ -1,0 +1,43 @@
+---
+description: Figma-to-code translation workflow for Polis Works playground
+alwaysApply: true
+---
+
+# Figma Translation Rules
+
+## MCP-first workflow
+
+1. **Never guess design values.** Use Figma MCP `get_design_context` with fileKey `Ra39Tjy7Kcf74D4P7EmmJP` before editing layout, typography, spacing, or colors.
+2. **Preserve node identity.** Every DOM element must keep `data-node-id` and `data-name` matching the Figma layer.
+3. **Consult manifest.** Look up node in `src/figma/manifest.ts` before changing a component. Update manifest if structure changes.
+4. **Use design tokens.** Values live in `src/figma/tokens.ts` as CSS custom properties. Do not hardcode Figma values in components.
+
+## Source reference
+
+- **File:** [Polis--Works](https://www.figma.com/design/Ra39Tjy7Kcf74D4P7EmmJP/Polis--Works)
+- **Section:** `89:266` (desktop `88:174`, mobile `89:233`)
+- **Component root:** `src/components/polis/PolisHome.tsx`
+
+## Correction phrase templates
+
+```
+@figma node:88:179 property:font-weight value:600
+@figma node:88:189 property:gap value:20px
+@figma re-sync node:88:174
+```
+
+- `re-sync` → call `get_design_context` for that node before editing
+- Map node IDs via `src/figma/manifest.ts`
+
+## Responsive strategy
+
+One page, not two frames. Tailwind breakpoints match Figma deltas:
+
+- `md+`: section centered, 2-col grid, py-10 px-6
+- `<md`: section top-aligned, 1-col grid, p-6
+
+## Motion
+
+- Entrance: GSAP `useGSAP` in `src/lib/gsap/useEntranceAnimation.ts`
+- Link hover: CSS transitions only (interruptible UI)
+- Respect `prefers-reduced-motion`

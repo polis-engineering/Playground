@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #202020;
+
+  --polis-font-size: 15px;
+  --polis-line-height: 21.75px;
+  --polis-letter-spacing: -0.15px;
+  --polis-color-primary: #202020;
+  --polis-color-muted: #646464;
+  --polis-container-max-width: 600px;
+  --polis-container-gap: 24px;
+  --polis-grid-gap: 16px;
+  --polis-section-padding-x: 24px;
+  --polis-section-padding-y: 24px;
+  --polis-name-weight: 500;
+  --polis-motion-enabled: 1;
+  --polis-motion-stagger: 0.08;
+  --polis-motion-duration: 0.6;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --polis-section-padding-y: 40px;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}

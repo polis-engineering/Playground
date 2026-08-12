@@ -1,0 +1,35 @@
+---
+description: How to apply Figma design corrections from chat
+globs: src/components/polis/**,src/figma/**
+---
+
+# Design Corrections Workflow
+
+## Parsing correction phrases
+
+Format: `@figma node:{nodeId} property:{cssProperty} value:{newValue}`
+
+Example: `Fix node 88:179 → font-weight → 600` maps to:
+
+```
+@figma node:88:179 property:font-weight value:600
+```
+
+## Steps
+
+1. Look up node in `src/figma/manifest.ts` → find `componentPath`
+2. Open the component file
+3. Apply change using CSS vars from `src/figma/tokens.ts` when possible
+4. Update `cssProperties` snapshot in manifest if value changed permanently
+5. If `re-sync` requested, call Figma MCP first, then reconcile
+
+## Dev tools handoff
+
+- **Overlay:** hover `[data-node-id]` → shows nodeId, name, manifest path
+- **Click:** copies `@figma node:...` snippet to clipboard
+- **Panel:** live CSS var tweaks → "Copy tokens" → paste into chat
+
+## Token updates
+
+Global token changes go in `src/figma/tokens.ts` and `:root` in `globals.css`.
+Component-specific overrides use inline styles or Tailwind arbitrary values with CSS vars.
