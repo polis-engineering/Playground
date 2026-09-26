@@ -76,6 +76,7 @@ export function DevPlayground({ serverItems, source }: { serverItems: GalleryIte
   const [open, setOpen] = useState(true);
   const [log, setLog] = useState<string[]>([]);
   const [readout, setReadout] = useState({ activeIndex: 0, mediaIndex: 0, expanded: false });
+  const [peek, setPeek] = useState({ achieved: 0, reachable: true });
 
   const set = <K extends keyof DevState>(group: K, patch: Partial<DevState[K]>) =>
     setS((prev) => ({ ...prev, [group]: { ...prev[group], ...patch } }));
@@ -153,6 +154,12 @@ export function DevPlayground({ serverItems, source }: { serverItems: GalleryIte
         cylinder={{
           ...galleryProps.cylinder,
           onActiveChange: (index, direction) => push(`onActiveChange(${index}, ${direction})`),
+          onLayoutChange: (layout) =>
+            setPeek((p) =>
+              p.achieved === layout.peekAchieved && p.reachable === layout.peekReachable
+                ? p
+                : { achieved: layout.peekAchieved, reachable: layout.peekReachable },
+            ),
           onSnapSettle: (index) => {
             push(`onSnapSettle(${index})`);
             setReadout((r) => ({ ...r, activeIndex: index }));
@@ -180,6 +187,10 @@ export function DevPlayground({ serverItems, source }: { serverItems: GalleryIte
             <span>active: {readout.activeIndex}</span>
             <span>media: {readout.mediaIndex}</span>
             <span>expanded: {String(readout.expanded)}</span>
+            <span style={peek.reachable ? undefined : { color: "#f87171" }}>
+              peek: {peek.achieved.toFixed(3)}
+              {peek.reachable ? "" : " (unreachable)"}
+            </span>
           </div>
           <div className="dv-actions">
             <button type="button" onClick={() => setS(initialState())}>

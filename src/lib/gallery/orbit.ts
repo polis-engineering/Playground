@@ -85,18 +85,99 @@ export function neighborVisibleFraction(a: PeekArgs & { radius: number }) {
   return clamp((near + a.viewportHeight / 2) / height, 0, 1);
 }
 
-/** Binary search for the radius whose neighbour peek equals `peekRatio`. Monotonic in radius. */
-export function solveAutoRadius(a: PeekArgs & { peekRatio: number }) {
-  if (!(a.viewportHeight > 0) || !(a.cardHeight > 0) || !(a.perspective > 0) || !(a.spacing > 0)) return 0;
-  const target = clamp(a.peekRatio, ORBIT_GUARDS.peekRatioMin, ORBIT_GUARDS.peekRatioMax);
-  let lo = 0;
-  let hi = a.viewportHeight * 1000;
-  for (let i = 0; i < ORBIT_GUARDS.solverIterations; i++) {
-    const mid = (lo + hi) / 2;
-    if (neighborVisibleFraction({ ...a, radius: mid }) > target) lo = mid;
-    else hi = mid;
+/** True when the +1 neighbour's front face points at the camera (not edge-on / back-facing). */
+export function neighborFacesCamera(a: PeekArgs & { radius: number }) {
+  const pose = slotPose(1, {
+    radius: a.radius,
+    spacing: a.spacing,
+    tiltTopMultiplier: a.tiltMultiplier,
+    tiltBottomMultiplier: a.tiltMultiplier,
+  });
+  const toCameraY = -pose.y;
+  const toCameraZ = a.perspective - pose.z;
+  return -Math.sin(pose.rotationX) * toCameraY + Math.cos(pose.rotationX) * toCameraZ > 0;
+}
+
+/**
+ * Largest radius at which the +1 neighbour still faces the camera. The facing test is linear in radius:
+ * cosφ·d + R·(cosφ(1 − cosα) − sinα·sinφ) > 0.
+ */
+function frontFacingRadiusLimit(a: PeekArgs) {
+  const alpha = a.spacing;
+  const phi = alpha * a.tiltMultiplier;
+  const base = Math.cos(phi) * a.perspective;
+  const slope = Math.cos(phi) * (1 - Math.cos(alpha)) - Math.sin(alpha) * Math.sin(phi);
+  if (base <= 0) return 0;
+  if (slope >= 0) return Infinity;
+  return base / -slope;
+}
+
+export type RadiusSolution = { radius: number; achieved: number; reachable: boolean };
+
+/**
+ * Radius whose neighbour peek equals `peekRatio`, searched only where the neighbour faces the camera (wide FOVs or
+ * large spacings turn it edge-on inside the viewport, which makes the peek discontinuous). Scans for the first
+ * crossing, then bisects. When no radius reaches the target, returns the closest one with `reachable: false`.
+ */
+export function solveAutoRadiusDetailed(a: PeekArgs & { peekRatio: number }): RadiusSolution {
+  if (!(a.viewportHeight > 0) || !(a.cardHeight > 0) || !(a.perspective > 0) || !(a.spacing > 0)) {
+    return { radius: 0, achieved: 0, reachable: false };
   }
-  return (lo + hi) / 2;
+  const target = clamp(a.peekRatio, ORBIT_GUARDS.peekRatioMin, ORBIT_GUARDS.peekRatioMax);
+  const fraction = (radius: number) => neighborVisibleFraction({ ...a, radius });
+  const limit = frontFacingRadiusLimit(a) * (1 - 1e-4);
+  const hi = Math.min(a.viewportHeight * ORBIT_GUARDS.solverMaxRadiusFactor, limit);
+  const n = ORBIT_GUARDS.solverSamples;
+
+  let best = 0;
+  let prevR = 0;
+  let prevF = fraction(0);
+  for (let i = 1; i <= n && hi > 0; i++) {
+    const r = hi * (i / n) ** 4;
+    const f = fraction(r);
+    if (prevF > target && f <= target) {
+      let lo = prevR;
+      let up = r;
+      for (let k = 0; k < ORBIT_GUARDS.solverIterations; k++) {
+        const mid = (lo + up) / 2;
+        if (fraction(mid) > target) lo = mid;
+        else up = mid;
+      }
+      best = (lo + up) / 2;
+      break;
+    }
+    // Ties go to the larger radius so an unreachable peek never stacks neighbours on the center card (R → 0).
+    if (Math.abs(f - target) <= Math.abs(fraction(best) - target)) best = r;
+    prevR = r;
+    prevF = f;
+  }
+  let achieved = fraction(best);
+  const reachable = Math.abs(achieved - target) < ORBIT_GUARDS.peekTolerance;
+  if (!reachable && achieved > 0 && !neighborClearsCenter({ ...a, radius: best })) {
+    // Last resort: push neighbours out of view (off-screen / back-facing, hidden by backface-visibility).
+    best = a.viewportHeight * ORBIT_GUARDS.solverMaxRadiusFactor;
+    achieved = fraction(best);
+  }
+  return { radius: best, achieved, reachable };
+}
+
+/** True when the +1 neighbour's near edge projects below the center card (no overlap). */
+export function neighborClearsCenter(a: PeekArgs & { radius: number }) {
+  const pose = slotPose(1, {
+    radius: a.radius,
+    spacing: a.spacing,
+    tiltTopMultiplier: a.tiltMultiplier,
+    tiltBottomMultiplier: a.tiltMultiplier,
+  });
+  const half = a.cardHeight / 2;
+  const z = pose.z + half * Math.sin(pose.rotationX);
+  if (a.perspective - z <= 0) return false;
+  const nearY = ((pose.y + half * Math.cos(pose.rotationX)) * a.perspective) / (a.perspective - z);
+  return nearY < -half;
+}
+
+export function solveAutoRadius(a: PeekArgs & { peekRatio: number }) {
+  return solveAutoRadiusDetailed(a).radius;
 }
 
 export type OrbitLayoutInput = {
@@ -118,6 +199,10 @@ export type OrbitLayout = PoseOptions & {
   height: number;
   fovDeg: number;
   perspective: number;
+  /** Neighbour peek actually produced by this layout (0–1). */
+  peekAchieved: number;
+  /** False when `peekRatio` cannot be reached with this FOV / spacing / tilt (or an explicit radius misses it). */
+  peekReachable: boolean;
 };
 
 export function computeOrbitLayout(i: OrbitLayoutInput): OrbitLayout {
@@ -126,23 +211,55 @@ export function computeOrbitLayout(i: OrbitLayoutInput): OrbitLayout {
   const perspective = perspectiveDistance(i.height, fovDeg);
   const tiltTopMultiplier = tiltMultiplier(spacing, i.tiltTopDeg);
   const tiltBottomMultiplier = tiltMultiplier(spacing, i.tiltBottomDeg);
-  const radius =
-    typeof i.radius === "number" && Number.isFinite(i.radius)
-      ? Math.max(0, i.radius)
-      : solveAutoRadius({
-          viewportHeight: i.height,
-          cardHeight: i.cardHeight,
-          spacing,
-          perspective,
-          peekRatio: i.peekRatio,
-          tiltMultiplier: tiltBottomMultiplier,
-        });
-  return { width: i.width, height: i.height, fovDeg, perspective, radius, spacing, tiltTopMultiplier, tiltBottomMultiplier };
+  const peekArgs = {
+    viewportHeight: i.height,
+    cardHeight: i.cardHeight,
+    spacing,
+    perspective,
+    tiltMultiplier: tiltBottomMultiplier,
+  };
+  let radius: number;
+  let peekAchieved: number;
+  let peekReachable: boolean;
+  if (typeof i.radius === "number" && Number.isFinite(i.radius)) {
+    radius = Math.max(0, i.radius);
+    peekAchieved = neighborVisibleFraction({ ...peekArgs, radius });
+    peekReachable = Math.abs(peekAchieved - i.peekRatio) < ORBIT_GUARDS.peekTolerance;
+  } else {
+    const solved = solveAutoRadiusDetailed({ ...peekArgs, peekRatio: i.peekRatio });
+    radius = solved.radius;
+    peekAchieved = solved.achieved;
+    peekReachable = solved.reachable;
+  }
+  return {
+    width: i.width,
+    height: i.height,
+    fovDeg,
+    perspective,
+    radius,
+    spacing,
+    tiltTopMultiplier,
+    tiltBottomMultiplier,
+    peekAchieved,
+    peekReachable,
+  };
 }
 
 export function clampPosition(pos: number, itemCount: number, loop: boolean) {
   if (loop) return pos;
   return clamp(pos, 0, Math.max(0, itemCount - 1));
+}
+
+export function resolveInitialSlot(initialIndex: number, itemCount: number, loop: boolean) {
+  const start = Number.isFinite(initialIndex) ? Math.round(initialIndex) : 0;
+  return loop ? start : clamp(start, 0, Math.max(0, itemCount - 1));
+}
+
+/** DOM slots around `base`; without loop, slots outside the list are dropped (no wrapped neighbours). */
+export function visibleSlots(base: number, window: number, itemCount: number, loop: boolean) {
+  if (itemCount <= 0) return [];
+  const slots = windowSlots(base, window);
+  return loop ? slots : slots.filter((s) => s >= 0 && s < itemCount);
 }
 
 export function windowSlots(base: number, window: number) {

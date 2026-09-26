@@ -4,7 +4,12 @@ import {
   clampPosition,
   computeOrbitLayout,
   mod,
+  neighborClearsCenter,
+  neighborFacesCamera,
   neighborVisibleFraction,
+  resolveInitialSlot,
+  solveAutoRadiusDetailed,
+  visibleSlots,
   perspectiveDistance,
   resolveFovDeg,
   resolveSlotCount,
@@ -169,6 +174,73 @@ describe("solveAutoRadius", () => {
   });
 });
 
+describe("solveAutoRadiusDetailed across FOV × minVirtualSlots", () => {
+  type GridCase = { viewportWidth: number; viewportHeight: number; fov: number; minVirtualSlots: number; peekRatio: number };
+  const grid: GridCase[] = [];
+  for (const [viewportWidth, viewportHeight] of [
+    [1512, 982],
+    [393, 852],
+  ]) {
+    for (let fov = 10; fov <= 170; fov += 20) {
+      for (const minVirtualSlots of [5, 8, 12, 24]) {
+        for (const peekRatio of [0.1, 0.33, 0.5]) {
+          grid.push({ viewportWidth, viewportHeight, fov, minVirtualSlots, peekRatio });
+        }
+      }
+    }
+  }
+
+  const argsFor = (g: GridCase) => {
+    const spacing = resolveSpacing({ itemCount: 3, minVirtualSlots: g.minVirtualSlots });
+    return {
+      viewportHeight: g.viewportHeight,
+      cardHeight: g.viewportHeight * 0.48,
+      spacing,
+      perspective: perspectiveDistance(g.viewportHeight, resolveFovDeg(g.fov)),
+      tiltMultiplier: 1,
+    };
+  };
+
+  it.each(grid)("never shows a back-facing or center-covering neighbour for %o", (g) => {
+    const a = argsFor(g);
+    const out = solveAutoRadiusDetailed({ ...a, peekRatio: g.peekRatio });
+    if (out.achieved > 0) {
+      expect(neighborFacesCamera({ ...a, radius: out.radius })).toBe(true);
+      expect(neighborClearsCenter({ ...a, radius: out.radius })).toBe(true);
+    }
+  });
+
+  it.each(grid)("hits peekRatio when reachable, else reports it for %o", (g) => {
+    const a = argsFor(g);
+    const out = solveAutoRadiusDetailed({ ...a, peekRatio: g.peekRatio });
+    expect(out.achieved).toBeCloseTo(neighborVisibleFraction({ ...a, radius: out.radius }), 6);
+    if (out.reachable) expect(Math.abs(out.achieved - g.peekRatio)).toBeLessThan(0.005);
+    else expect(Math.abs(out.achieved - g.peekRatio)).toBeGreaterThanOrEqual(0.005);
+  });
+
+  it("is reachable at defaults", () => {
+    const out = solveAutoRadiusDetailed({
+      ...argsFor({ viewportWidth: 1512, viewportHeight: 982, fov: 30, minVirtualSlots: 12, peekRatio: 0.33 }),
+      peekRatio: 0.33,
+    });
+    expect(out.reachable).toBe(true);
+  });
+
+  it.each([50, 70, 90])("keeps the fallback neighbour off the center card when unreachable (FOV %i°, 5 slots)", (fov) => {
+    const a = argsFor({ viewportWidth: 1512, viewportHeight: 982, fov, minVirtualSlots: 5, peekRatio: 0.33 });
+    const out = solveAutoRadiusDetailed({ ...a, peekRatio: 0.33 });
+    expect(out.reachable).toBe(false);
+    const hidden = out.achieved === 0;
+    expect(hidden || neighborClearsCenter({ ...a, radius: out.radius })).toBe(true);
+  });
+
+  it("no longer lands on the back-facing discontinuity (FOV 90°, 8 slots, 393×852)", () => {
+    const a = argsFor({ viewportWidth: 393, viewportHeight: 852, fov: 90, minVirtualSlots: 8, peekRatio: 0.33 });
+    const out = solveAutoRadiusDetailed({ ...a, peekRatio: 0.33 });
+    expect(out.achieved).toBeGreaterThan(0);
+  });
+});
+
 describe("computeOrbitLayout", () => {
   const base = {
     width: 1512,
@@ -200,6 +272,14 @@ describe("computeOrbitLayout", () => {
     expect(computeOrbitLayout({ ...base, radius: 1234 }).radius).toBe(1234);
   });
 
+  it("reports the achieved peek and whether peekRatio was reached", () => {
+    const ok = computeOrbitLayout(base);
+    expect(ok.peekReachable).toBe(true);
+    expect(ok.peekAchieved).toBeCloseTo(0.33, 2);
+    const wide = computeOrbitLayout({ ...base, perspectiveFov: 150, minVirtualSlots: 5 });
+    expect(wide.peekReachable).toBe(false);
+  });
+
   it("guards negative explicit radius", () => {
     expect(computeOrbitLayout({ ...base, radius: -5 }).radius).toBe(0);
   });
@@ -225,6 +305,38 @@ describe("clampPosition", () => {
   it("clamps to the list when not looping", () => {
     expect(clampPosition(5.5, 3, false)).toBe(2);
     expect(clampPosition(-1, 3, false)).toBe(0);
+  });
+});
+
+describe("visibleSlots", () => {
+  it("keeps wrapped neighbours when looping", () => {
+    expect(visibleSlots(0, 2, 3, true)).toEqual([-2, -1, 0, 1, 2]);
+  });
+
+  it("drops slots outside the list when not looping", () => {
+    expect(visibleSlots(0, 2, 3, false)).toEqual([0, 1, 2]);
+    expect(visibleSlots(2, 2, 3, false)).toEqual([0, 1, 2]);
+    expect(visibleSlots(4, 2, 10, false)).toEqual([2, 3, 4, 5, 6]);
+  });
+
+  it("is empty for an empty list", () => {
+    expect(visibleSlots(0, 2, 0, true)).toEqual([]);
+  });
+});
+
+describe("resolveInitialSlot", () => {
+  it("keeps the raw slot when looping (item = mod)", () => {
+    expect(resolveInitialSlot(4, 3, true)).toBe(4);
+    expect(resolveInitialSlot(-1.4, 3, true)).toBe(-1);
+  });
+
+  it("clamps when not looping", () => {
+    expect(resolveInitialSlot(4, 3, false)).toBe(2);
+    expect(resolveInitialSlot(-1, 3, false)).toBe(0);
+  });
+
+  it("treats non-finite as 0", () => {
+    expect(resolveInitialSlot(Number.NaN, 3, true)).toBe(0);
   });
 });
 

@@ -12,7 +12,15 @@ import {
   useState,
 } from "react";
 import { CYLINDER_DEFAULTS, GESTURE_DEFAULTS, ORBIT_GUARDS } from "@/lib/gallery/defaults";
-import { clamp, computeOrbitLayout, mod, slotForOffset, windowSlots } from "@/lib/gallery/orbit";
+import {
+  clamp,
+  computeOrbitLayout,
+  mod,
+  type OrbitLayout,
+  resolveInitialSlot,
+  slotForOffset,
+  visibleSlots,
+} from "@/lib/gallery/orbit";
 import type { OrbitScene } from "@/lib/gallery/orbitScene";
 import { createStepper, normalizeWheelDelta, type StepperOptions } from "@/lib/gallery/stepper";
 import type { GalleryItem, Slot } from "@/lib/gallery/types";
@@ -63,8 +71,24 @@ export type CylinderGalleryProps = {
   onCenterClick?: (index: number) => void;
   renderItem: (args: CylinderRenderArgs) => ReactNode;
   ariaLabel?: string;
+  /** Fires after every relayout (resize / prop change) with the solved orbit, incl. `peekAchieved` / `peekReachable`. */
+  onLayoutChange?: (layout: OrbitLayout) => void;
   ref?: Ref<CylinderGalleryHandle>;
 };
+
+const warnedLayouts = new Set<string>();
+
+function warnUnreachablePeek(layout: OrbitLayout, peekRatio: number) {
+  if (process.env.NODE_ENV === "production" || layout.peekReachable) return;
+  const key = `${peekRatio}|${layout.fovDeg}|${layout.spacing.toFixed(4)}|${layout.height}`;
+  if (warnedLayouts.has(key)) return;
+  warnedLayouts.add(key);
+  console.warn(
+    `[cylinder-gallery] peekRatio ${peekRatio} is unreachable at FOV ${layout.fovDeg}° / spacing ` +
+      `${((layout.spacing * 180) / Math.PI).toFixed(1)}° (neighbour peek ${layout.peekAchieved.toFixed(3)}). ` +
+      "Lower perspectiveFov or raise minVirtualSlots.",
+  );
+}
 
 export function CylinderGallery({
   items,
@@ -88,6 +112,7 @@ export function CylinderGallery({
   onCenterClick,
   renderItem,
   ariaLabel,
+  onLayoutChange,
   ref,
 }: CylinderGalleryProps) {
   const itemCount = items.length;
@@ -97,10 +122,7 @@ export function CylinderGallery({
   const swipeMinVelocity = gestures?.swipeMinVelocity ?? GESTURE_DEFAULTS.swipeMinVelocity;
   const tapSlopPx = gestures?.tapSlopPx ?? GESTURE_DEFAULTS.tapSlopPx;
 
-  const [initialSlot] = useState(() => {
-    const start = Math.round(Number.isFinite(initialIndex) ? initialIndex : 0);
-    return loop ? start : clamp(start, 0, Math.max(0, itemCount - 1));
-  });
+  const [initialSlot] = useState(() => resolveInitialSlot(initialIndex, itemCount, loop));
 
   const rootRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef<HTMLDivElement>(null);
@@ -136,6 +158,7 @@ export function CylinderGallery({
     onActiveChange,
     onSnapSettle,
     onCenterClick,
+    onLayoutChange,
   });
   useLayoutEffect(() => {
     live.current = {
@@ -154,6 +177,7 @@ export function CylinderGallery({
       onActiveChange,
       onSnapSettle,
       onCenterClick,
+      onLayoutChange,
     };
   });
 
@@ -180,21 +204,24 @@ export function CylinderGallery({
     const scene = sceneRef.current;
     if (!root || !measure || !scene) return;
     const l = live.current;
-    scene.setLayout(
-      computeOrbitLayout({
-        width: root.clientWidth,
-        height: root.clientHeight,
-        cardHeight: measure.offsetHeight,
-        itemCount: l.itemCount,
-        peekRatio: l.peekRatio,
-        radius: l.radius,
-        minVirtualSlots: l.minVirtualSlots,
-        perspectiveFov: l.perspectiveFov,
-        itemAngularSpacing: l.itemAngularSpacing,
-        tiltTopDeg: l.tiltTopDeg,
-        tiltBottomDeg: l.tiltBottomDeg,
-      }),
-    );
+    const layout = computeOrbitLayout({
+      width: root.clientWidth,
+      height: root.clientHeight,
+      cardHeight: measure.offsetHeight,
+      itemCount: l.itemCount,
+      peekRatio: l.peekRatio,
+      radius: l.radius,
+      minVirtualSlots: l.minVirtualSlots,
+      perspectiveFov: l.perspectiveFov,
+      itemAngularSpacing: l.itemAngularSpacing,
+      tiltTopDeg: l.tiltTopDeg,
+      tiltBottomDeg: l.tiltBottomDeg,
+    });
+    scene.setLayout(layout);
+    root.dataset.peek = layout.peekAchieved.toFixed(3);
+    root.dataset.peekReachable = String(layout.peekReachable);
+    warnUnreachablePeek(layout, l.peekRatio);
+    l.onLayoutChange?.(layout);
     renderAll();
   }, [renderAll]);
 
@@ -231,6 +258,24 @@ export function CylinderGallery({
   }, [renderAll, base, itemCount, ready]);
 
   useEffect(() => () => void tweenRef.current?.kill(), []);
+
+  // Without loop the position must be a real list index (a wrapped slot, or one past a shrunk list, maps via mod).
+  useLayoutEffect(() => {
+    if (loop || itemCount === 0) return;
+    const target = targetRef.current;
+    const next = mod(target, itemCount);
+    if (next === target) return;
+    tweenRef.current?.kill();
+    snappingRef.current = false;
+    posRef.current.value = next;
+    targetRef.current = next;
+    baseRef.current = next;
+    setBase(next);
+    setSettled(next);
+    setSnapping(false);
+    live.current.onSnapSettle?.(next);
+    renderAll();
+  }, [loop, itemCount, renderAll]);
 
   const goTo = useCallback(
     (rawTarget: number) => {
@@ -356,7 +401,7 @@ export function CylinderGallery({
     [goTo],
   );
 
-  const slots = itemCount > 0 ? windowSlots(base, ORBIT_GUARDS.renderWindow) : [];
+  const slots = visibleSlots(base, ORBIT_GUARDS.renderWindow, itemCount, loop);
 
   return (
     <div

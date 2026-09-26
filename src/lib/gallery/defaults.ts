@@ -39,8 +39,11 @@ export const ORBIT_GUARDS = {
   peekRatioMax: 0.9,
   /** [IMPL] DOM cards rendered either side of the center slot. */
   renderWindow: 2,
-  /** [IMPL] radius solver iterations (binary search). */
+  /** [IMPL] radius solver: scan samples, bisection iterations, search ceiling (× viewport height), peek tolerance. */
+  solverSamples: 256,
   solverIterations: 60,
+  solverMaxRadiusFactor: 1000,
+  peekTolerance: 0.005,
 };
 
 export const GESTURE_DEFAULTS = {
@@ -55,6 +58,9 @@ export const GESTURE_DEFAULTS = {
   /** [IMPL] movement below this is a tap (click); above it, the click is suppressed. */
   tapSlopPx: 8,
 };
+
+/** [IMPL] px per line for `WheelEvent.deltaMode === DOM_DELTA_LINE` (Firefox mouse wheels). */
+export const WHEEL_LINE_HEIGHT_PX = 16;
 
 export const CARD_DEFAULTS = {
   /** [OPEN §12.4] token values per breakpoint. Defaults keep a 4:3 shell that fits 3 slots at any viewport. */
@@ -78,6 +84,8 @@ export const MEDIA_DEFAULTS = {
   aspectMorph: { duration: 0.45, ease: "power3.inOut" },
   /** [ASSUMPTION §10] media error → fallback, then skip to next asset after this delay. */
   mediaErrorSkipMs: 1200,
+  /** [IMPL] visible fraction of the gallery below which it counts as "off-viewport" and pauses (spec §6). */
+  viewportPauseThreshold: 0.25,
   /** [IMPL] Sanity CDN srcset widths and `sizes` hint (spec §11.9: CDN + sized URLs). */
   imageWidths: [480, 800, 1200, 1600, 2000],
   imageSizes: "(max-width: 768px) 90vw, 50vw",
@@ -88,6 +96,9 @@ export const EXPAND_DEFAULTS = {
   flipDurationMs: 500,
   /** [IMPL] */
   flipEase: "power3.inOut",
+  /** [IMPL] copy + close-button fade durations as a fraction of flipDurationMs (in after the flip, out before it). */
+  copyFadeInRatio: 0.5,
+  copyFadeOutRatio: 0.3,
   /** [FACT] only option. */
   scroll: "vertical" as const,
   /** [FACT] phase-1 body copy. */
