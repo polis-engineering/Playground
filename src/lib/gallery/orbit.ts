@@ -47,7 +47,9 @@ export type PoseOptions = {
 
 /**
  * Pose of a card `offset` slots away from the center (fractional while snapping).
- * Cylinder axis = X, center of the cylinder at z = -radius, positive offset = below (next item enters from bottom).
+ * Concave drum: the cylinder axis (X) sits in front of the cards at z = +radius, so neighbours curve toward the viewer
+ * and tilt to face the center (top card faces down, bottom card faces up). Positive offset = below (next enters from
+ * the bottom).
  */
 export function slotPose(offset: number, o: PoseOptions) {
   const angle = offset * o.spacing;
@@ -55,8 +57,8 @@ export function slotPose(offset: number, o: PoseOptions) {
   return {
     angle,
     y: -o.radius * Math.sin(angle),
-    z: o.radius * Math.cos(angle) - o.radius,
-    rotationX: angle * multiplier,
+    z: o.radius - o.radius * Math.cos(angle),
+    rotationX: -angle * multiplier,
   };
 }
 
@@ -85,31 +87,49 @@ export function neighborVisibleFraction(a: PeekArgs & { radius: number }) {
   return clamp((near + a.viewportHeight / 2) / height, 0, 1);
 }
 
-/** True when the +1 neighbour's front face points at the camera (not edge-on / back-facing). */
-export function neighborFacesCamera(a: PeekArgs & { radius: number }) {
-  const pose = slotPose(1, {
+function neighborPose(a: PeekArgs & { radius: number }) {
+  return slotPose(1, {
     radius: a.radius,
     spacing: a.spacing,
     tiltTopMultiplier: a.tiltMultiplier,
     tiltBottomMultiplier: a.tiltMultiplier,
   });
-  const toCameraY = -pose.y;
-  const toCameraZ = a.perspective - pose.z;
-  return -Math.sin(pose.rotationX) * toCameraY + Math.cos(pose.rotationX) * toCameraZ > 0;
 }
 
-/**
- * Largest radius at which the +1 neighbour still faces the camera. The facing test is linear in radius:
- * cosφ·d + R·(cosφ(1 − cosα) − sinα·sinφ) > 0.
- */
-function frontFacingRadiusLimit(a: PeekArgs) {
-  const alpha = a.spacing;
-  const phi = alpha * a.tiltMultiplier;
-  const base = Math.cos(phi) * a.perspective;
-  const slope = Math.cos(phi) * (1 - Math.cos(alpha)) - Math.sin(alpha) * Math.sin(phi);
-  if (base <= 0) return 0;
-  if (slope >= 0) return Infinity;
-  return base / -slope;
+/** Card normal (after rotation.x = φ: (0, −sin φ, cos φ)) · vector to the camera. Linear in radius. */
+function neighborFacingDot(a: PeekArgs & { radius: number }) {
+  const pose = neighborPose(a);
+  return -Math.sin(pose.rotationX) * -pose.y + Math.cos(pose.rotationX) * (a.perspective - pose.z);
+}
+
+/** True when the +1 neighbour's front face points at the camera (not edge-on / back-facing). */
+export function neighborFacesCamera(a: PeekArgs & { radius: number }) {
+  return neighborFacingDot(a) > 0;
+}
+
+/** z of the +1 neighbour's point closest to the camera. */
+export function neighborNearestZ(a: PeekArgs & { radius: number }) {
+  const pose = neighborPose(a);
+  return pose.z + (a.cardHeight / 2) * Math.abs(Math.sin(pose.rotationX));
+}
+
+/** Largest radius at which a quantity linear in radius stays below `limit` (Infinity when it never reaches it). */
+function linearRadiusLimit(at: (radius: number) => number, limit: number) {
+  const base = at(0);
+  const slope = at(1) - base;
+  if (base >= limit) return 0;
+  if (slope <= 0) return Infinity;
+  return (limit - base) / slope;
+}
+
+/** Radius range where the neighbour faces the camera and stays in front of the near plane. */
+function radiusSearchCeiling(a: PeekArgs) {
+  const facing = linearRadiusLimit((radius) => -neighborFacingDot({ ...a, radius }), 0);
+  const near = linearRadiusLimit(
+    (radius) => neighborNearestZ({ ...a, radius }),
+    a.perspective * ORBIT_GUARDS.nearPlaneFraction,
+  );
+  return Math.min(a.viewportHeight * ORBIT_GUARDS.solverMaxRadiusFactor, facing * (1 - 1e-4), near);
 }
 
 export type RadiusSolution = { radius: number; achieved: number; reachable: boolean };
@@ -125,8 +145,7 @@ export function solveAutoRadiusDetailed(a: PeekArgs & { peekRatio: number }): Ra
   }
   const target = clamp(a.peekRatio, ORBIT_GUARDS.peekRatioMin, ORBIT_GUARDS.peekRatioMax);
   const fraction = (radius: number) => neighborVisibleFraction({ ...a, radius });
-  const limit = frontFacingRadiusLimit(a) * (1 - 1e-4);
-  const hi = Math.min(a.viewportHeight * ORBIT_GUARDS.solverMaxRadiusFactor, limit);
+  const hi = radiusSearchCeiling(a);
   const n = ORBIT_GUARDS.solverSamples;
 
   let best = 0;
@@ -151,14 +170,40 @@ export function solveAutoRadiusDetailed(a: PeekArgs & { peekRatio: number }): Ra
     prevR = r;
     prevF = f;
   }
+  // Not covering the center card outranks the exact peek (magnified concave neighbours at wide FOVs).
+  if (fraction(best) > 0 && !neighborClearsCenter({ ...a, radius: best })) {
+    best = firstClearingRadius(a, best, hi) ?? best;
+  }
   let achieved = fraction(best);
-  const reachable = Math.abs(achieved - target) < ORBIT_GUARDS.peekTolerance;
+  const reachable =
+    Math.abs(achieved - target) < ORBIT_GUARDS.peekTolerance && neighborClearsCenter({ ...a, radius: best });
   if (!reachable && achieved > 0 && !neighborClearsCenter({ ...a, radius: best })) {
-    // Last resort: push neighbours out of view (off-screen / back-facing, hidden by backface-visibility).
+    // Last resort: push neighbours out of view (off-screen or past the near plane, where orbitScene hides them).
     best = a.viewportHeight * ORBIT_GUARDS.solverMaxRadiusFactor;
     achieved = fraction(best);
   }
   return { radius: best, achieved, reachable };
+}
+
+function firstClearingRadius(a: PeekArgs, from: number, hi: number) {
+  const clears = (radius: number) => neighborClearsCenter({ ...a, radius });
+  const n = ORBIT_GUARDS.solverSamples;
+  let prev = from;
+  for (let i = 1; i <= n; i++) {
+    const r = from + (hi - from) * (i / n);
+    if (clears(r)) {
+      let lo = prev;
+      let up = r;
+      for (let k = 0; k < ORBIT_GUARDS.solverIterations; k++) {
+        const mid = (lo + up) / 2;
+        if (clears(mid)) up = mid;
+        else lo = mid;
+      }
+      return up;
+    }
+    prev = r;
+  }
+  return null;
 }
 
 /** True when the +1 neighbour's near edge projects below the center card (no overlap). */
@@ -197,6 +242,7 @@ export type OrbitLayoutInput = {
 export type OrbitLayout = PoseOptions & {
   width: number;
   height: number;
+  cardHeight: number;
   fovDeg: number;
   perspective: number;
   /** Neighbour peek actually produced by this layout (0–1). */
@@ -234,6 +280,7 @@ export function computeOrbitLayout(i: OrbitLayoutInput): OrbitLayout {
   return {
     width: i.width,
     height: i.height,
+    cardHeight: i.cardHeight,
     fovDeg,
     perspective,
     radius,

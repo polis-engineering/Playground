@@ -44,7 +44,15 @@ describe("createOrbitScene", () => {
     expect(card.style.visibility).toBe("visible");
   });
 
-  it("stacks nearer cards above farther ones", () => {
+  it("hides a card that would cross the camera's near plane", () => {
+    const scene = createOrbitScene(THREE, stub());
+    scene.setLayout({ ...layout, radius: layout.perspective * 20 });
+    const card = stub();
+    scene.poseCard(card, 1);
+    expect(card.style.visibility).toBe("hidden");
+  });
+
+  it("stacks the center card above its neighbours", () => {
     const scene = createOrbitScene(THREE, stub());
     scene.setLayout(layout);
     const center = stub();

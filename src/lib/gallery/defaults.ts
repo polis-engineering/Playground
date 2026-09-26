@@ -30,8 +30,8 @@ export const ORBIT_GUARDS = {
   /** [IMPL] spacing overrides are clamped into (0, 90°). */
   spacingMin: 0.01,
   spacingMax: Math.PI / 2 - 0.01,
-  /** [IMPL] vertical FOV used when perspectiveFov = "auto". */
-  autoFovDeg: 30,
+  /** [IMPL] vertical FOV used when perspectiveFov = "auto". 27° reproduces the Figma frame (neighbour ≈ 496px tall at 1512×982). */
+  autoFovDeg: 27,
   fovMinDeg: 1,
   fovMaxDeg: 170,
   /** [IMPL] peekRatio is clamped into this range. */
@@ -39,6 +39,8 @@ export const ORBIT_GUARDS = {
   peekRatioMax: 0.9,
   /** [IMPL] DOM cards rendered either side of the center slot. */
   renderWindow: 2,
+  /** [IMPL] concave orbit: cards whose nearest point passes this fraction of the camera distance are hidden. */
+  nearPlaneFraction: 0.8,
   /** [IMPL] radius solver: scan samples, bisection iterations, search ceiling (× viewport height), peek tolerance. */
   solverSamples: 256,
   solverIterations: 60,

@@ -6,6 +6,7 @@ import {
   mod,
   neighborClearsCenter,
   neighborFacesCamera,
+  neighborNearestZ,
   neighborVisibleFraction,
   resolveInitialSlot,
   solveAutoRadiusDetailed,
@@ -106,23 +107,32 @@ describe("slotPose", () => {
     expect(p.rotationX).toBeCloseTo(0);
   });
 
-  it("puts the next item below and behind (it enters from the bottom)", () => {
+  it("puts the next item below and toward the viewer (concave: it enters from the bottom)", () => {
     const p = slotPose(1, opts);
     expect(p.y).toBeLessThan(0);
-    expect(p.z).toBeLessThan(0);
-    expect(p.rotationX).toBeCloseTo(Math.PI / 6);
+    expect(p.z).toBeGreaterThan(0);
   });
 
-  it("puts the previous item above", () => {
+  it("tilts the bottom card to face up toward the center", () => {
+    const p = slotPose(1, opts);
+    expect(p.rotationX).toBeCloseTo(-Math.PI / 6);
+    // normal after rotation.x = φ is (0, -sin φ, cos φ): must point up (+y) and toward the camera (+z)
+    expect(-Math.sin(p.rotationX)).toBeGreaterThan(0);
+    expect(Math.cos(p.rotationX)).toBeGreaterThan(0);
+  });
+
+  it("puts the previous item above, facing down toward the center", () => {
     const p = slotPose(-1, opts);
     expect(p.y).toBeGreaterThan(0);
-    expect(p.rotationX).toBeCloseTo(-Math.PI / 6);
+    expect(p.z).toBeGreaterThan(0);
+    expect(p.rotationX).toBeCloseTo(Math.PI / 6);
+    expect(-Math.sin(p.rotationX)).toBeLessThan(0);
   });
 
   it("applies separate top/bottom tilt multipliers", () => {
     const p = slotPose(-1, { ...opts, tiltTopMultiplier: 0.5 });
-    expect(p.rotationX).toBeCloseTo(-Math.PI / 12);
-    expect(slotPose(1, { ...opts, tiltBottomMultiplier: 2 }).rotationX).toBeCloseTo(Math.PI / 3);
+    expect(p.rotationX).toBeCloseTo(Math.PI / 12);
+    expect(slotPose(1, { ...opts, tiltBottomMultiplier: 2 }).rotationX).toBeCloseTo(-Math.PI / 3);
   });
 });
 
@@ -138,13 +148,29 @@ describe("solveAutoRadius", () => {
     }
   }
 
-  it.each(cases)("hits peekRatio for %o", ({ viewportHeight, cardRatio, itemCount, peekRatio }) => {
+  it.each(cases)("hits peekRatio unless that would cover the center card, for %o", ({ viewportHeight, cardRatio, itemCount, peekRatio }) => {
     const spacing = resolveSpacing({ itemCount, minVirtualSlots: 12 });
     const perspective = perspectiveDistance(viewportHeight, resolveFovDeg("auto"));
     const args = { viewportHeight, cardHeight: viewportHeight * cardRatio, spacing, perspective, tiltMultiplier: 1 };
-    const radius = solveAutoRadius({ ...args, peekRatio });
-    expect(radius).toBeGreaterThan(0);
-    expect(neighborVisibleFraction({ ...args, radius })).toBeCloseTo(peekRatio, 2);
+    const out = solveAutoRadiusDetailed({ ...args, peekRatio });
+    expect(out.radius).toBeGreaterThan(0);
+    expect(neighborClearsCenter({ ...args, radius: out.radius })).toBe(true);
+    if (out.reachable) expect(neighborVisibleFraction({ ...args, radius: out.radius })).toBeCloseTo(peekRatio, 2);
+    else expect(out.achieved).toBeLessThan(peekRatio);
+  });
+
+  it.each([852, 982, 1200])("always reaches the default 0.33 peek at viewport height %i", (viewportHeight) => {
+    for (const itemCount of [1, 3, 12, 40]) {
+      const out = solveAutoRadiusDetailed({
+        viewportHeight,
+        cardHeight: viewportHeight * 0.4693,
+        spacing: resolveSpacing({ itemCount, minVirtualSlots: 12 }),
+        perspective: perspectiveDistance(viewportHeight, resolveFovDeg("auto")),
+        tiltMultiplier: 1,
+        peekRatio: 0.33,
+      });
+      expect(out.reachable).toBe(true);
+    }
   });
 
   it("keeps a gap between center and neighbour at default proportions", () => {
@@ -201,12 +227,13 @@ describe("solveAutoRadiusDetailed across FOV × minVirtualSlots", () => {
     };
   };
 
-  it.each(grid)("never shows a back-facing or center-covering neighbour for %o", (g) => {
+  it.each(grid)("never shows a back-facing, center-covering or camera-crossing neighbour for %o", (g) => {
     const a = argsFor(g);
     const out = solveAutoRadiusDetailed({ ...a, peekRatio: g.peekRatio });
     if (out.achieved > 0) {
       expect(neighborFacesCamera({ ...a, radius: out.radius })).toBe(true);
       expect(neighborClearsCenter({ ...a, radius: out.radius })).toBe(true);
+      expect(neighborNearestZ({ ...a, radius: out.radius })).toBeLessThan(a.perspective * ORBIT_GUARDS.nearPlaneFraction + 1e-6);
     }
   });
 
@@ -226,7 +253,7 @@ describe("solveAutoRadiusDetailed across FOV × minVirtualSlots", () => {
     expect(out.reachable).toBe(true);
   });
 
-  it.each([50, 70, 90])("keeps the fallback neighbour off the center card when unreachable (FOV %i°, 5 slots)", (fov) => {
+  it.each([90, 110])("keeps the fallback neighbour off the center card when unreachable (FOV %i°, 5 slots)", (fov) => {
     const a = argsFor({ viewportWidth: 1512, viewportHeight: 982, fov, minVirtualSlots: 5, peekRatio: 0.33 });
     const out = solveAutoRadiusDetailed({ ...a, peekRatio: 0.33 });
     expect(out.reachable).toBe(false);

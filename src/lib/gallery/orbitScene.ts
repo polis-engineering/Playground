@@ -53,7 +53,11 @@ export function createOrbitScene(THREE: Three, cameraElement: HTMLElement) {
       card.position.set(0, pose.y, pose.z);
       card.rotation.set(pose.rotationX, 0, 0);
       card.updateMatrixWorld(true);
-      const visible = Math.abs(offset) < ORBIT_GUARDS.renderWindow && Math.abs(pose.angle) < Math.PI / 2;
+      const nearestZ = pose.z + (layout.cardHeight / 2) * Math.abs(Math.sin(pose.rotationX));
+      const visible =
+        Math.abs(offset) < ORBIT_GUARDS.renderWindow &&
+        Math.abs(pose.angle) < Math.PI / 2 &&
+        nearestZ < layout.perspective * ORBIT_GUARDS.nearPlaneFraction;
       element.style.transform = objectCssMatrix(card.matrixWorld);
       element.style.visibility = visible ? "visible" : "hidden";
       element.style.zIndex = String(1000 - Math.round(Math.abs(offset) * 100));
