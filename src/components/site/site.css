@@ -1,0 +1,180 @@
+.site-home {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+}
+
+/* Chrome steps aside while a card is expanded (the placeholder owns the screen). */
+.site-home .site-logo,
+.site-home .site-about {
+  transition:
+    opacity 200ms var(--ease-out),
+    transform 160ms var(--ease-out),
+    background-color 160ms ease;
+}
+
+.site-home[data-expanded="true"] .site-logo,
+.site-home[data-expanded="true"] .site-about {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Figma Logo: 56×56, 16px from the top, centered. */
+.site-logo {
+  position: fixed;
+  top: var(--spacing-lg);
+  left: 50%;
+  z-index: 20;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* Figma Button "About": glass pill, 56px tall, 24px from the bottom, centered. */
+.site-about {
+  position: fixed;
+  bottom: var(--spacing-2xl);
+  left: 50%;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  height: 56px;
+  padding: var(--spacing-3xs) var(--spacing-2xl);
+  border: 0;
+  color: var(--labels-primary);
+  font-family: var(--font-grotesk);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  letter-spacing: var(--type-body-tracking);
+  white-space: nowrap;
+  cursor: pointer;
+  translate: -50% 0;
+}
+
+/* About bottom sheet (Figma 591:948). CSS transitions so open/close is interruptible; exit faster than enter. */
+.site-sheet-root {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.site-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+.site-sheet-root[data-open="true"] .site-sheet-backdrop {
+  pointer-events: auto;
+}
+
+.site-sheet {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: min(568px, 90dvh);
+  max-height: 90dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--spacing-2xl);
+  border-radius: var(--radius-3xl) var(--radius-3xl) var(--radius-none) var(--radius-none);
+  background: var(--material-ultra-thin);
+  -webkit-backdrop-filter: blur(var(--material-frost-blur));
+  backdrop-filter: blur(var(--material-frost-blur));
+  box-shadow: var(--material-frost-inner), var(--shadow-sheet);
+  isolation: isolate;
+  outline: none;
+  pointer-events: auto;
+  transform: translateY(100%);
+  visibility: hidden;
+  transition:
+    transform 250ms var(--ease-out),
+    visibility 0s linear 250ms;
+}
+
+.site-sheet::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: var(--border-width-material);
+  border-radius: inherit;
+  background: var(--border-primary);
+  mix-blend-mode: plus-lighter;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+.site-sheet-root[data-open="true"] .site-sheet {
+  transform: translateY(0);
+  visibility: visible;
+  transition:
+    transform 400ms var(--ease-drawer),
+    visibility 0s;
+}
+
+.site-sheet-content {
+  display: flex;
+  flex: 1 0 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 32px;
+  max-width: 358px;
+}
+
+.site-sheet-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xl);
+  color: var(--labels-primary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  letter-spacing: var(--type-body-tracking);
+}
+
+.site-sheet-text p {
+  margin: 0;
+  text-box: trim-both cap alphabetic;
+}
+
+.site-literature {
+  font-family: var(--font-literature);
+  font-weight: 500;
+  letter-spacing: var(--type-literature-tracking);
+}
+
+.site-sheet-ctas {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+}
+
+/* Figma Button (CTA): Fills-Opaque/Tertiary under the glass material, 56px, pl 24 / pr 16. */
+.site-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  height: 56px;
+  padding: var(--spacing-3xs) var(--spacing-lg) var(--spacing-3xs) var(--spacing-2xl);
+  border: 0;
+  background-color: var(--fills-opaque-tertiary);
+  background-image: linear-gradient(var(--material-ultra-thin), var(--material-ultra-thin));
+  color: var(--labels-primary);
+  font-family: var(--font-grotesk);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  letter-spacing: var(--type-body-tracking);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}

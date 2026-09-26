@@ -1,0 +1,381 @@
+.cg-root {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--backgrounds-primary);
+  isolation: isolate;
+}
+
+.cg-cylinder-wrap {
+  position: absolute;
+  inset: 0;
+}
+
+.cg-cylinder {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Flat container: every card carries its own full projection (see orbitScene.ts). */
+.cg-camera {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.cg-slot,
+.cg-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--cg-card-width);
+  height: var(--cg-card-height);
+}
+
+.cg-slot {
+  visibility: hidden;
+  pointer-events: auto;
+  cursor: pointer;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
+  outline: none;
+}
+
+.cg-slot:focus-visible .cg-frame {
+  outline: 2px solid var(--accents-blue);
+  outline-offset: 4px;
+}
+
+.cg-measure {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Placeholder shell = orbit slot. Transparent: only the media box inside is visible. */
+.cg-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: var(--cg-card-padding);
+}
+
+/* Fixed slot box; the media box morphs inside it (spring overshoot may exceed it). */
+.cg-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  container-type: size;
+}
+
+/*
+ * Visible placeholder = media box (Figma "Content well"): bounds always equal the current media's.
+ * Anchored at the slot center and centered by transform, so width/height morphs never move its layout start point
+ * (Layout Instability ignores transform changes → CLS 0). GSAP animates width/height on this node only.
+ */
+.cg-frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(100cqw, calc(100cqh * var(--cg-ratio)));
+  height: min(100cqh, calc(100cqw / var(--cg-ratio)));
+  border-radius: var(--cg-card-radius);
+  background: var(--cg-card-bg);
+  box-shadow: var(--cg-card-shadow);
+  overflow: hidden;
+  isolation: isolate;
+  container-type: size;
+}
+
+/* Figma Border/Primary: 3px inside gradient stroke, blend Linear Dodge. */
+.cg-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  padding: var(--border-width-content-well);
+  border-radius: inherit;
+  background: var(--border-primary);
+  mix-blend-mode: plus-lighter;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+/* Stacked clips: only the current one is opaque (hard handoff, no crossfade). */
+.cg-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.cg-layer[data-current="true"] {
+  opacity: 1;
+}
+
+.cg-media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.cg-media-fallback {
+  width: 100%;
+  height: 100%;
+  background: var(--fills-opaque-tertiary);
+}
+
+/* Figma Material (Ultra Thin + Frost) with the 1px Border/Primary stroke. Hosts set their own positioning. */
+.cg-glass {
+  border-radius: var(--radius-full);
+  background: var(--material-ultra-thin);
+  -webkit-backdrop-filter: blur(var(--material-frost-blur));
+  backdrop-filter: blur(var(--material-frost-blur));
+  box-shadow: var(--material-frost-inner);
+  isolation: isolate;
+}
+
+.cg-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: var(--border-width-material);
+  border-radius: inherit;
+  background: var(--border-primary);
+  mix-blend-mode: plus-lighter;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+/*
+ * Figma "Media context", 21px from the media box's bottom-right. Positioned by transform in container units so it tracks
+ * the morphing box without a layout shift.
+ */
+.cg-media-context {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  transform: translate(calc(100cqw - 100% - 21px), calc(100cqh - 100% - 21px));
+  pointer-events: none;
+}
+
+.cg-tag {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  height: 40px;
+  padding: 0 var(--spacing-xl);
+  color: var(--labels-white);
+  font-family: var(--font-grotesk);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  letter-spacing: var(--type-body-tracking);
+  white-space: nowrap;
+  text-box: trim-both cap alphabetic;
+}
+
+.cg-pause {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+
+.cg-media-context[data-interactive="true"] .cg-pause {
+  pointer-events: auto;
+}
+
+.cg-pause[aria-pressed="true"] img {
+  opacity: 0.6;
+}
+
+/* Press feedback (Emil): responsive scale on :active; hover only on fine pointers. */
+.cg-pressable {
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 160ms ease;
+}
+
+.cg-pressable:active {
+  transform: scale(0.97);
+}
+
+.cg-pressable:focus-visible {
+  outline: 2px solid var(--accents-blue);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cg-pressable:hover {
+    background-color: rgba(246, 246, 246, 0.32);
+  }
+}
+
+/* Loading: skeleton in 3 slots, no orbit until ready. */
+.cg-skeleton {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cg-skeleton-block {
+  position: absolute;
+  left: 50%;
+  width: var(--cg-card-width);
+  height: var(--cg-card-height);
+  border-radius: var(--cg-card-radius);
+  background: linear-gradient(100deg, #f2f2f2 20%, #e9e9e9 40%, #f2f2f2 60%);
+  background-size: 300% 100%;
+  animation: cg-shimmer 1.4s linear infinite;
+}
+
+.cg-skeleton-block[data-slot="top"] {
+  top: 0;
+  transform: translate(-50%, calc(-100% * (1 - var(--cg-peek))));
+}
+
+.cg-skeleton-block[data-slot="center"] {
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.cg-skeleton-block[data-slot="bottom"] {
+  bottom: 0;
+  transform: translate(-50%, calc(100% * (1 - var(--cg-peek))));
+}
+
+@keyframes cg-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.cg-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+/* Expanded: the placeholder scaled up, empty (media fades out during the flip). */
+.cg-expand {
+  position: fixed;
+  inset: var(--cg-expand-inset);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--cg-expand-radius);
+  background: var(--cg-expand-bg);
+  box-shadow: var(--shadow-content-well);
+  overflow: hidden;
+  outline: none;
+}
+
+.cg-expand::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  padding: var(--border-width-content-well);
+  border-radius: inherit;
+  background: var(--border-primary);
+  mix-blend-mode: plus-lighter;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+.cg-expand-media {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  will-change: opacity, filter;
+}
+
+.cg-expand-scroll {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  outline: none;
+}
+
+.cg-expand-body {
+  padding: var(--spacing-2xl);
+  color: var(--labels-primary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  letter-spacing: var(--type-body-tracking);
+  text-align: center;
+}
+
+.cg-expand-close {
+  position: absolute;
+  top: var(--spacing-2xl);
+  right: var(--spacing-2xl);
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+
+.cg-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

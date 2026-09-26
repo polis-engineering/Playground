@@ -1,0 +1,74 @@
+/*
+ * Design tokens from Figma "Polis--Works" (fileKey Ra39Tjy7Kcf74D4P7EmmJP), light mode.
+ * Names mirror the Figma variables (Labels/Primary → --labels-primary, radius/4xl → --radius-4xl, …).
+ */
+
+@font-face {
+  font-family: "NAP MD Grotesk";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  /* Licensed font: add url("/fonts/nap-md-grotesk-regular.woff2") format("woff2") once the file is in public/fonts. */
+  src: local("NAP MD Grotesk"), local("NAPMDGrotesk-Regular");
+}
+
+@font-face {
+  font-family: "Times New Literature";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: local("Times New Literature Medium"), local("TimesNewLiterature-Medium");
+}
+
+:root {
+  /* Colors */
+  --backgrounds-primary: #ffffff;
+  --labels-primary: rgba(0, 0, 0, 0.85);
+  --labels-secondary: rgba(0, 0, 0, 0.5);
+  --labels-tertiary: rgba(0, 0, 0, 0.25);
+  --labels-white: #ffffff;
+  --accents-blue: #0088ff;
+  --fills-opaque-tertiary: rgba(0, 0, 0, 0.05);
+
+  /* Material/Ultra Thin + Material/Frost (BACKGROUND_BLUR 16 → CSS blur 8px, two inner shadows) */
+  --material-ultra-thin: rgba(246, 246, 246, 0.16);
+  --material-frost-blur: 8px;
+  --material-frost-inner: inset 2px 1px 16px 0 rgba(23, 23, 23, 0.08), inset -1px -2px 8px 0 rgba(246, 246, 246, 0.04);
+
+  /* Border/Primary: inside gradient stroke, blend LINEAR_DODGE (= plus-lighter) */
+  --border-primary: linear-gradient(to bottom right, #3c3c43 0%, rgba(23, 23, 23, 0) 50%, #3c3c43 100%);
+  --border-width-content-well: 3px;
+  --border-width-material: 1px;
+
+  /* Effects */
+  --shadow-primary: 0 16px 48px 0 rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.23);
+  --shadow-content-well: 0 16px 48px 0 rgba(0, 0, 0, 0.35);
+  --shadow-sheet: 0 0 0 1px rgba(0, 0, 0, 0.23), 0 16px 24px rgba(0, 0, 0, 0.35);
+
+  /* Radius */
+  --radius-none: 0px;
+  --radius-3xl: 24px;
+  --radius-4xl: 32px;
+  --radius-full: 9999px;
+
+  /* Spacing */
+  --spacing-none: 0px;
+  --spacing-3xs: 4px;
+  --spacing-xs: 8px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+
+  /* Typography: NAP MD Grotesk/Label + /Body (16/22, -0.15px) */
+  --font-grotesk: "NAP MD Grotesk", var(--font-fallback-grotesk), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-literature: "Times New Literature", "Times New Roman", Times, serif;
+  --type-body-size: 16px;
+  --type-body-line: 22px;
+  --type-body-tracking: -0.15px;
+  --type-literature-tracking: 0.64px;
+
+  /* Motion (Emil curves) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
