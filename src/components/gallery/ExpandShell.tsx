@@ -51,6 +51,7 @@ export function ExpandShell({
 
   const panelRef = useRef<HTMLDivElement>(null);
   const copyRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
   const onClosedRef = useRef(onClosed);
@@ -63,16 +64,24 @@ export function ExpandShell({
     () => {
       const panel = panelRef.current;
       const copy = copyRef.current;
-      if (!mounted || !panel || !copy) return;
+      const scroll = scrollRef.current;
+      const close = closeRef.current;
+      if (!mounted || !panel || !copy || !scroll || !close) return;
       const duration = Math.max(0, flipDurationMs) / 1000;
       const origin = originElement?.isConnected ? originElement : null;
 
       // Media rides along with the Flip (it is the card, scaled up); only the copy waits for the flip (spec §7.4).
+      // No scrollbar while the panel is smaller than its content mid-flip.
+      gsap.set(scroll, { overflowY: "hidden" });
       if (open) {
         gsap.set(copy, { autoAlpha: 0 });
+        gsap.set(close, { opacity: 0 });
         const reveal = () => {
+          gsap.set(scroll, { clearProps: "overflowY" });
           gsap.to(copy, { autoAlpha: 1, duration: duration * 0.5 });
-          closeRef.current?.focus({ preventScroll: true });
+          // opacity only: autoAlpha's first frame (visibility: hidden) would blur the focused button.
+          gsap.to(close, { opacity: 1, duration: duration * 0.5 });
+          close.focus({ preventScroll: true });
         };
         if (origin) {
           Flip.fit(panel, origin, {
@@ -94,6 +103,7 @@ export function ExpandShell({
         onClosedRef.current?.();
       };
       gsap.to(copy, { autoAlpha: 0, duration: duration * 0.3 });
+      gsap.to(close, { opacity: 0, duration: duration * 0.3 });
       if (origin) {
         Flip.fit(panel, origin, { duration, ease: flipEase, borderRadius: originRadius(origin), onComplete: finish });
       } else {
@@ -144,7 +154,7 @@ export function ExpandShell({
       <button ref={closeRef} type="button" className="cg-expand-close" aria-label="Close" onClick={onClose}>
         <span aria-hidden>×</span>
       </button>
-      <div className="cg-expand-scroll" tabIndex={0}>
+      <div ref={scrollRef} className="cg-expand-scroll" tabIndex={0}>
         {media}
         <div ref={copyRef} className="cg-expand-body">
           {children}
