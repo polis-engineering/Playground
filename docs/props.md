@@ -132,7 +132,7 @@ geometry.
 | `cylinderFadeOutMs` / `cylinderFadeInMs` | `number` | `200` / `300` | [IMPL] | `<Gallery expand>` only. |
 | `inset` | CSS inset | `max(12px, 3dvh) max(12px, 3vw)` | [OPEN §12.4] | Expanded placeholder geometry. |
 | `borderRadius` | CSS length | `var(--radius-4xl)` | [FIGMA] | Flip tweens from the card radius. |
-| `background` | CSS color | `transparent` | [FIGMA] | Empty placeholder: shadow + border only. |
+| `background` | CSS color | `var(--backgrounds-primary)` | [FIGMA] | Empty placeholder = page color (the Linear Dodge border blends with it and vanishes, as on the Figma canvas). |
 
 ## Gestures [IMPL] — `<Gallery gestures={…}>`
 

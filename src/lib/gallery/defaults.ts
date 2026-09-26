@@ -128,8 +128,12 @@ export const EXPAND_DEFAULTS = {
   scroll: "vertical" as const,
   /** [FACT] phase-1 body copy. */
   placeholder: "Soon, check back later",
-  /** [OPEN §12.4] expanded placeholder geometry — design pending. Fill stays transparent like the card. */
+  /** [OPEN §12.4] expanded placeholder geometry — design pending. */
   inset: "max(12px, 3dvh) max(12px, 3vw)",
   borderRadius: "var(--radius-4xl)",
-  background: "transparent",
+  /**
+   * Page color, i.e. visually empty. The fixed panel is its own blend group, so over a transparent fill Border/Primary's
+   * Linear Dodge would show its raw #3c3c43; over white it vanishes exactly like on the Figma canvas.
+   */
+  background: "var(--backgrounds-primary)",
 };
