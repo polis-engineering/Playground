@@ -16,22 +16,33 @@ const layout = computeOrbitLayout({
   perspectiveFov: "auto",
 });
 
+const d = String(Math.round(layout.perspective * 1000) / 1000);
+
 describe("createOrbitScene", () => {
-  it("puts the camera at the perspective distance, origin at viewport center", () => {
+  it("sizes the (flat) camera container to the viewport", () => {
     const camera = stub();
     createOrbitScene(THREE, camera).setLayout(layout);
-    const d = String(Math.round(layout.perspective * 1000) / 1000);
-    expect(camera.style.transform.startsWith(`perspective(${d}px) translateZ(${d}px)`)).toBe(true);
-    expect(camera.style.transform).toContain("translate(756px,491px)");
+    expect(camera.style.width).toBe("1512px");
+    expect(camera.style.height).toBe("982px");
   });
 
-  it("renders the center card face-on", () => {
+  it("projects each card on its own (no shared preserve-3d depth sort)", () => {
+    const scene = createOrbitScene(THREE, stub());
+    scene.setLayout(layout);
+    const card = stub();
+    scene.poseCard(card, 0);
+    expect(card.style.transform.startsWith(`translate(756px,491px) perspective(${d}px) translateZ(${d}px)`)).toBe(true);
+    expect(card.style.transform.endsWith("translate(-50%,-50%)")).toBe(true);
+    expect(card.style.transformOrigin).toBe("0 0");
+  });
+
+  it("renders the center card face-on at scale 1", () => {
     const scene = createOrbitScene(THREE, stub());
     scene.setLayout(layout);
     const card = stub();
     scene.poseCard(card, 0);
     expect(card.style.visibility).toBe("visible");
-    expect(card.style.transform).toBe("translate(-50%,-50%)matrix3d(1,0,0,0,0,-1,0,0,0,0,1,0,0,0,0,1)");
+    expect(card.style.transform).toContain("matrix3d(1,0,0,0,0,-1,0,0,0,0,1,0,0,0,0,1)translate(-50%,-50%)");
   });
 
   it("hides cards outside the ±2 render window", () => {
