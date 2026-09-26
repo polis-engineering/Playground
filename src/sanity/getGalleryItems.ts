@@ -1,18 +1,15 @@
 import "server-only";
 import { createClient } from "next-sanity";
-import { createMockItems } from "@/lib/gallery/mock";
-import type { GalleryItem } from "@/lib/gallery/types";
 import { apiVersion, dataset, isSanityConfigured, projectId } from "./env";
-import { mapGalleryItems } from "./mapGallery";
+import { loadGallery } from "./loadGallery";
 import { GALLERY_QUERY } from "./queries";
 
-export type GallerySource = "sanity" | "mock";
+export type { GallerySource } from "./loadGallery";
 
 export const GALLERY_REVALIDATE_SECONDS = 60;
 
-export async function getGalleryItems(): Promise<{ items: GalleryItem[]; source: GallerySource }> {
-  if (!isSanityConfigured) return { items: createMockItems(), source: "mock" };
-  try {
+export function getGalleryItems() {
+  return loadGallery(isSanityConfigured, async () => {
     const client = createClient({
       projectId,
       dataset,
@@ -22,9 +19,6 @@ export async function getGalleryItems(): Promise<{ items: GalleryItem[]; source:
       token: process.env.SANITY_API_READ_TOKEN,
     });
     const rows = await client.fetch(GALLERY_QUERY, {}, { next: { revalidate: GALLERY_REVALIDATE_SECONDS } });
-    return { items: mapGalleryItems(rows as unknown[]), source: "sanity" };
-  } catch (error) {
-    console.error("[cylinder-gallery] Sanity fetch failed, using mock data", error);
-    return { items: createMockItems(), source: "mock" };
-  }
+    return rows as unknown[];
+  });
 }
