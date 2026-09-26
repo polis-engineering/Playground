@@ -32,11 +32,10 @@ describe("cardTokensToVars", () => {
 
 describe("expandTokensToVars", () => {
   it("maps expand tokens to CSS custom properties", () => {
-    expect(expandTokensToVars({ inset: "10px", borderRadius: "4px", background: "#000", mediaMaxHeight: "50dvh" })).toEqual({
+    expect(expandTokensToVars({ inset: "10px", borderRadius: "4px", background: "#000" })).toEqual({
       "--cg-expand-inset": "10px",
       "--cg-expand-radius": "4px",
       "--cg-expand-bg": "#000",
-      "--cg-expand-media-max-h": "50dvh",
     });
   });
 });

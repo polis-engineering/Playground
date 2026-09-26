@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import type { EaseValue, SpringConfig } from "./easing";
 import type { MediaImage } from "./types";
 
 /** §5 GalleryItemCard CSS tokens + tilt overrides. */
@@ -13,14 +14,15 @@ export type CardTokens = {
   tiltBottomDeg?: number;
 };
 
-export type BounceConfig = { duration: number; ease: string; fromScale: number };
-export type AspectMorphConfig = { duration: number; ease: string };
+/** Entrance spring (seconds). */
+export type BounceConfig = { duration: number; spring: SpringConfig };
+/** Exit compress before the hard cut (seconds) + handoff inset. */
+export type AspectMorphConfig = { duration: number; ease: EaseValue; insetScale: number };
 
 export type ExpandTokens = {
   inset?: string;
   borderRadius?: string;
   background?: string;
-  mediaMaxHeight?: string;
 };
 
 export function withDefaults<T extends object>(defaults: T, overrides?: Partial<T>): T {
@@ -55,7 +57,6 @@ const EXPAND_VARS: Record<string, string> = {
   inset: "--cg-expand-inset",
   borderRadius: "--cg-expand-radius",
   background: "--cg-expand-bg",
-  mediaMaxHeight: "--cg-expand-media-max-h",
 };
 
 export const cardTokensToVars = (tokens: CardTokens) => toVars(CARD_VARS, tokens);

@@ -25,7 +25,19 @@ function Img({ image, alt, eager, onError }: { image: MediaImage; alt: string; e
   );
 }
 
-function Video({ asset, playing, onError }: { asset: MediaAsset; playing: boolean; onError?: () => void }) {
+function Video({
+  asset,
+  playing,
+  eager,
+  restartToken,
+  onError,
+}: {
+  asset: MediaAsset;
+  playing: boolean;
+  eager?: boolean;
+  restartToken?: number;
+  onError?: () => void;
+}) {
   const ref = useRef<HTMLVideoElement>(null);
   const onErrorRef = useRef(onError);
   useEffect(() => {
@@ -64,6 +76,14 @@ function Video({ asset, playing, onError }: { asset: MediaAsset; playing: boolea
     };
   }, [asset.video?.src, asset.video?.playbackId]);
 
+  const lastRestart = useRef(restartToken);
+  useEffect(() => {
+    const video = ref.current;
+    if (!video || restartToken === undefined || restartToken === lastRestart.current) return;
+    lastRestart.current = restartToken;
+    video.currentTime = 0;
+  }, [restartToken]);
+
   useEffect(() => {
     const video = ref.current;
     if (!video) return;
@@ -80,7 +100,7 @@ function Video({ asset, playing, onError }: { asset: MediaAsset; playing: boolea
       muted
       playsInline
       loop
-      preload="metadata"
+      preload={eager ? "auto" : "metadata"}
       aria-label={asset.alt}
       onError={onError}
     />
@@ -93,11 +113,13 @@ export type MediaViewProps = {
   playing: boolean;
   failed?: boolean;
   eager?: boolean;
+  /** Video only: a new value rewinds to 0 (a clip re-entering the cycle starts over). */
+  restartToken?: number;
   onError?: () => void;
 };
 
 /** One media asset filling its frame. Failed media → poster, else solid fallback (spec §10). */
-export function MediaView({ asset, playing, failed, eager, onError }: MediaViewProps) {
+export function MediaView({ asset, playing, failed, eager, restartToken, onError }: MediaViewProps) {
   if (failed) {
     return asset.poster ? (
       <Img image={asset.poster} alt={asset.alt} eager={eager} />
@@ -105,7 +127,9 @@ export function MediaView({ asset, playing, failed, eager, onError }: MediaViewP
       <div className="cg-media-fallback" role="img" aria-label={asset.alt} />
     );
   }
-  if (asset.kind === "video") return <Video asset={asset} playing={playing} onError={onError} />;
+  if (asset.kind === "video") {
+    return <Video asset={asset} playing={playing} eager={eager} restartToken={restartToken} onError={onError} />;
+  }
   if (!asset.image) return <div className="cg-media-fallback" role="img" aria-label={asset.alt} />;
   return <Img image={asset.image} alt={asset.alt} eager={eager} onError={onError} />;
 }

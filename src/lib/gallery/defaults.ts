@@ -1,3 +1,5 @@
+import type { EaseValue } from "./easing";
+
 /**
  * Every layout / 3D / timing default lives here (spec §5: "no silent magic numbers").
  * Tags: [FACT] locked by spec v0.2, [ASSUMPTION] spec default until contradicted,
@@ -65,13 +67,19 @@ export const GESTURE_DEFAULTS = {
 export const WHEEL_LINE_HEIGHT_PX = 16;
 
 export const CARD_DEFAULTS = {
-  /** [OPEN §12.4] token values per breakpoint. Defaults keep a 4:3 shell that fits 3 slots at any viewport. */
-  width: "min(86vw, calc(48dvh * 4 / 3))",
-  height: "min(48dvh, calc(86vw * 3 / 4))",
-  borderRadius: "20px",
+  /**
+   * Slot = the media's maximum (16:9) box. Figma desktop (1512×982): 819.2 × 460.8, i.e. 46.93dvh tall.
+   * Narrower aspects (4:3, 1:1) use the full height. [OPEN §12.4] mobile values (no mobile frame yet).
+   */
+  width: "min(calc(46.93dvh * 16 / 9), 86vw)",
+  height: "min(46.93dvh, calc(86vw * 9 / 16))",
+  /** Figma radius/4xl — applied to the visible placeholder (media box). */
+  borderRadius: "var(--radius-4xl)",
   padding: "0px",
-  background: "#161618",
-  shadow: "0 30px 80px rgba(0, 0, 0, 0.45)",
+  /** Placeholder fill under the media. Transparent: only the media has content. */
+  background: "transparent",
+  /** Figma Content well effect (drop shadow 0 16 48 / 35%). */
+  shadow: "var(--shadow-content-well)",
   /** `undefined` = derived from orbit. Degrees at the ±1 slot; applied as a multiplier of the orbit angle. */
   tiltTopDeg: undefined as number | undefined,
   tiltBottomDeg: undefined as number | undefined,
@@ -80,10 +88,16 @@ export const CARD_DEFAULTS = {
 export const MEDIA_DEFAULTS = {
   /** [FACT] */
   intervalMs: 3500,
-  /** [ASSUMPTION] duration/ease from spec; fromScale is [IMPL]. */
-  bounce: { duration: 0.45, ease: "back.out(1.7)", fromScale: 0.94 },
-  /** [IMPL] GSAP Flip on the absolutely positioned media frame — outer shell never changes. */
-  aspectMorph: { duration: 0.45, ease: "power3.inOut" },
+  /**
+   * Entrance (annex + Figma motion context): the incoming clip springs from the handoff box to full size.
+   * Spring = 1 − e^(−t·decay)(cos(t·frequency) + ratio·sin(t·frequency)), bounce ≈ 0.35.
+   */
+  bounce: { duration: 0.4, spring: { decay: 7.5258, frequency: 8.7987, ratio: 0.8553 } },
+  /**
+   * Exit (annex + Figma): the outgoing clip compresses (own aspect) during the last `duration` of the interval,
+   * then a hard opacity cut. insetScale = 405.8 / 460.8 from the Figma keyframes.
+   */
+  aspectMorph: { duration: 0.15, ease: [0.5, 0, 1, 1] as EaseValue, insetScale: 405.8 / 460.8 },
   /** [ASSUMPTION §10] media error → fallback, then skip to next asset after this delay. */
   mediaErrorSkipMs: 1200,
   /** [IMPL] visible fraction of the gallery below which it counts as "off-viewport" and pauses (spec §6). */
@@ -94,20 +108,28 @@ export const MEDIA_DEFAULTS = {
 };
 
 export const EXPAND_DEFAULTS = {
-  /** [ASSUMPTION] */
-  flipDurationMs: 500,
-  /** [IMPL] */
-  flipEase: "power3.inOut",
-  /** [IMPL] copy + close-button fade durations as a fraction of flipDurationMs (in after the flip, out before it). */
-  copyFadeInRatio: 0.5,
-  copyFadeOutRatio: 0.3,
+  /** Open: the placeholder grows from the card. Emil pass: modal range, strong drawer ease-out (was 500ms). */
+  flipDurationMs: 400,
+  flipEase: [0.32, 0.72, 0, 1] as EaseValue,
+  /** Close: exits faster than it enters; on-screen morph → ease-in-out. */
+  closeDurationMs: 300,
+  closeEase: [0.77, 0, 0.175, 1] as EaseValue,
+  /** Media fades + blurs out as the placeholder scales up (blur masks the crossfade), back in as it lands. */
+  mediaHideMs: 200,
+  mediaHideBlurPx: 10,
+  /** Copy + close button reveal after the flip. */
+  copyRevealMs: 200,
+  copyOffsetPx: 8,
+  copyHideMs: 120,
+  /** Cylinder fade: out fast on open, back in during the close. */
+  cylinderFadeOutMs: 200,
+  cylinderFadeInMs: 300,
   /** [FACT] only option. */
   scroll: "vertical" as const,
   /** [FACT] phase-1 body copy. */
   placeholder: "Soon, check back later",
-  /** [OPEN §12.4] expanded shell tokens — design pending. */
+  /** [OPEN §12.4] expanded placeholder geometry — design pending. Fill stays transparent like the card. */
   inset: "max(12px, 3dvh) max(12px, 3vw)",
-  borderRadius: "24px",
-  background: "#161618",
-  mediaMaxHeight: "70dvh",
+  borderRadius: "var(--radius-4xl)",
+  background: "transparent",
 };

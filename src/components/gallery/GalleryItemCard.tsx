@@ -11,18 +11,21 @@ export type GalleryItemCardProps = CardTokens & {
   isExpanded?: boolean;
   /** Frozen media index shown when inactive (and the start frame when it becomes active). */
   mediaIndex: number;
-  /** Frame aspect override; defaults to the current media's aspect. */
+  /** Media box aspect override; defaults to the current media's aspect. */
   aspect?: Aspect;
   /** Standalone use only — inside CylinderGallery the center click is routed by the cylinder. */
   onExpand?: () => void;
   paused?: boolean;
   media?: Pick<ActiveMediaStageProps, "intervalMs" | "bounce" | "aspectMorph" | "mediaErrorSkipMs">;
   onMediaIndexChange?: (index: number, assetKey: string) => void;
+  /** Glass pause button (video content). */
+  onTogglePause?: () => void;
 };
 
 /**
- * Fixed placeholder shell (spec §5). Every card keeps one ActiveMediaStage instance so leaving the center keeps the exact
- * last frame (including the paused <video> element); only the active card cycles.
+ * Placeholder shell (spec §5). The shell itself is transparent and fixed (it is the orbit slot); the visible placeholder is
+ * the media box inside it, whose bounds always match the media currently showing. One ActiveMediaStage instance per card
+ * keeps the exact last frame when the card leaves the center.
  */
 export function GalleryItemCard({
   item,
@@ -35,6 +38,7 @@ export function GalleryItemCard({
   paused = false,
   media,
   onMediaIndexChange,
+  onTogglePause,
   ...tokens
 }: GalleryItemCardProps) {
   return (
@@ -48,11 +52,12 @@ export function GalleryItemCard({
     >
       <ActiveMediaStage
         assets={item.media}
-        active={isActive}
-        paused={paused || isExpanded}
+        active={isActive && !isExpanded}
+        paused={paused}
         frozenFrame={item.media[mediaIndex]?._key}
         forcedAspect={aspect}
         onIndexChange={onMediaIndexChange}
+        onTogglePause={onTogglePause}
         intervalMs={media?.intervalMs}
         bounce={media?.bounce}
         aspectMorph={media?.aspectMorph}

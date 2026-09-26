@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { cubicBezier, springEase } from "@/lib/gallery/easing";
+import { cubicBezier, springEase, toGsapEase } from "@/lib/gallery/easing";
+
+describe("toGsapEase", () => {
+  it("passes GSAP ease strings through", () => {
+    expect(toGsapEase("power4.out")).toBe("power4.out");
+  });
+
+  it("turns a bezier tuple into an ease function", () => {
+    const e = toGsapEase([0.5, 0, 1, 1]);
+    expect(typeof e).toBe("function");
+    expect((e as (t: number) => number)(0.5)).toBeCloseTo(cubicBezier(0.5, 0, 1, 1)(0.5), 10);
+  });
+});
 
 const FIGMA_SPRING = { decay: 7.5258, frequency: 8.7987, ratio: 0.8553 };
 

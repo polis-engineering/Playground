@@ -2,6 +2,13 @@ export type Ease = (t: number) => number;
 
 export type SpringConfig = { decay: number; frequency: number; ratio: number };
 
+/** GSAP ease string, or CSS cubic-bezier control points. */
+export type EaseValue = string | readonly [number, number, number, number];
+
+export function toGsapEase(value: EaseValue): string | Ease {
+  return typeof value === "string" ? value : cubicBezier(value[0], value[1], value[2], value[3]);
+}
+
 /**
  * Damped spring as exported by Figma's motion context:
  * 1 − e^(−t·decay) · (cos(t·frequency) + ratio · sin(t·frequency)), t ∈ [0, 1] of the segment.
