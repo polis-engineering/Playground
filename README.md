@@ -142,6 +142,9 @@ Key decisions (see [`docs/superpowers/specs/2026-09-26-cylinder-gallery-design.m
 
 ## Vercel
 
+Preview: **https://cylinder-gallery-azure.vercel.app** (public production alias kept through the rename;
+`agency-site.vercel.app` belongs to another account).
+
 Vercel-ready with defaults (framework auto-detected, pnpm via `packageManager`). A Vercel project **`agency-site`**
 (renamed from `cylinder-gallery`) exists in team `polis-engineerings-projects`; it was deployed from this branch through the Vercel API and is **not yet
 Git-connected**. After the repo moves (below): Project → Settings → Git → connect `polis-engineering/agency-site`
