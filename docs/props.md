@@ -1,21 +1,22 @@
 # Props reference
 
 Every layout / 3D / timing value is a prop with its default in `src/lib/gallery/defaults.ts` (spec §5: no silent magic
-numbers). All of them are live-editable at **`/dev`**.
+numbers). Visual values come from the Figma tokens in `src/app/tokens.css`. All of them are live-editable at **`/dev`**.
 
 Tags: **[FACT]** locked by spec v0.2 · **[ASSUMPTION]** spec default until contradicted · **[IMPL]** implementation knob the
-spec does not name (exposed so it is never silent) · **[OPEN]** needs a product decision.
+spec does not name (exposed so it is never silent) · **[FIGMA]** taken from the Figma file / motion context ·
+**[OPEN]** needs a product decision.
 
-Components live in `src/components/gallery/`. Most apps only render `<Gallery>`, which composes the others and forwards
-prop groups:
+Components live in `src/components/gallery/` (gallery) and `src/components/site/` (page chrome). Most apps render
+`<Gallery>`, which composes the gallery components and forwards prop groups:
 
 ```tsx
 <Gallery
   items={items}
   cylinder={{ peekRatio: 0.33, snapDurationMs: 620 }}
-  card={{ height: "min(48dvh, 64vw)", borderRadius: "20px" }}
+  card={{ borderRadius: "var(--radius-4xl)" }}
   media={{ intervalMs: 3500 }}
-  expand={{ flipDurationMs: 500 }}
+  expand={{ flipDurationMs: 400 }}
   gestures={{ wheelStepThreshold: 40 }}
 />
 ```
@@ -24,98 +25,114 @@ prop groups:
 
 ## `CylinderGallery` (spec §5) — `<Gallery cylinder={…}>`
 
+Concave drum: the ±1 neighbours curve **toward** the viewer and tilt to face the center (top card faces down, bottom
+card faces up). Each card carries its own full CSS projection (no shared `preserve-3d` context), see `orbitScene.ts`.
+
 | Prop | Type | Default | Tag | Notes |
 |---|---|---|---|---|
 | `items` | `GalleryItem[]` | required | [FACT] | From Sanity (`getGalleryItems()`), mock fallback. Passed as `<Gallery items>`. |
 | `initialIndex` | `number` | `0` | | Rounded; clamped when `loop=false`. Read on mount only. |
 | `visibleCount` | `3` | `3` | [FACT] | Type-locked to `3`. |
 | `peekRatio` | `number` | `0.33` | [FACT] | Visible fraction of the top/bottom card's *projected* height. Clamped to `[0, 0.9]`. |
-| `radius` | `number \| "auto"` | `"auto"` | [FACT] | `"auto"` = perspective-correct binary search so the neighbour peek equals `peekRatio` for the current viewport height and card height. A number is used as-is (px, clamped `≥ 0`). |
+| `radius` | `number \| "auto"` | `"auto"` | [FACT] | `"auto"` = perspective-correct solve so the neighbour peek equals `peekRatio` without covering the center card. A number is used as-is (px, `≥ 0`). |
 | `itemAngularSpacing` | `number` (radians) | derived | [FACT] | Derived: `2π / max(N, minVirtualSlots, 5)`. Explicit values clamped to `(0.01, π/2 − 0.01)`. |
-| `minVirtualSlots` | `number` | `12` | [FACT] | Pads short lists for orbit math. Floor of `5` keeps the ±1 neighbours front-facing. |
-| `perspectiveFov` | `"auto" \| number` | `"auto"` | [FACT] | Vertical FOV in degrees (Three.js `PerspectiveCamera.fov`). `"auto"` = `30°` [IMPL]. Clamped `[1, 170]`. |
+| `minVirtualSlots` | `number` | `12` | [FACT] | Pads short lists for orbit math. |
+| `perspectiveFov` | `"auto" \| number` | `"auto"` | [FACT] | Vertical FOV in degrees (Three.js `PerspectiveCamera.fov`). `"auto"` = **27°** [FIGMA]: reproduces the frame's neighbour size (≈ 496px tall at 1512×982). Clamped `[1, 170]`. |
 | `snapDurationMs` | `number` | `620` | [ASSUMPTION] | GSAP tween of the orbit position. `0` = instant. |
 | `snapEase` | GSAP ease string | `"power4.out"` | | Quartic ease-out, matches s.page. |
-| `loop` | `boolean` | `true` | [FACT] | Infinite wrap. `false` clamps to `[0, N−1]`. |
-| `locked` | `boolean` | `false` | [FACT] | Blocks wheel / swipe / click / keys. `Gallery` forces `true` while expanded. |
+| `loop` | `boolean` | `true` | [FACT] | Infinite wrap. `false` clamps and renders no wrapped neighbours. |
+| `locked` | `boolean` | `false` | [FACT] | Blocks wheel / swipe / click / keys. Forced `true` while expanded or while the About sheet is open. |
 | `onActiveChange` | `(index, direction: 1 \| -1) => void` | — | | Fires when a snap starts. |
 | `onSnapSettle` | `(index) => void` | — | | Fires when the snap tween completes. |
+| `onLayoutChange` | `(layout) => void` | — | [IMPL] | Solved orbit after each relayout, incl. `peekAchieved` / `peekReachable`. |
 | `className` / `style` | — | — | | Escape hatches. On `<Gallery>` they apply to the root. |
 
-`CylinderGallery` also accepts `renderItem`, `onCenterClick`, `gestures`, `tiltTopDeg`, `tiltBottomDeg`, `ariaLabel`,
-`onLayoutChange(layout)` (solved orbit incl. `peekAchieved` / `peekReachable`) and a `ref` exposing
-`{ step(±1), snapTo(index), activeCardElement(), isSnapping() }`.
-
-With `loop={false}` no wrapped neighbours are rendered at either end, and turning loop off (or shrinking the list)
-re-maps the position to the same item index.
+`CylinderGallery` also accepts `renderItem`, `onCenterClick`, `gestures`, `tiltTopDeg`, `tiltBottomDeg`, `ariaLabel` and a
+`ref` exposing `{ step(±1), snapTo(index), activeCardElement(), isSnapping() }`.
 
 ### When `peekRatio` is unreachable
 
-The solver only searches radii where the ±1 neighbour faces the camera. Wide FOVs combined with large spacing turn the
-neighbour edge-on while it is still inside the viewport, so no radius gives the requested peek. The layout then
-reports `peekReachable: false` (also `data-peek` / `data-peek-reachable` on `.cg-cylinder`, the `/dev` readout, and a
-dev-only `console.warn`). It keeps the closest non-overlapping radius, or pushes the neighbours out of view rather than
-over the center card. Tested reachable envelope at 1512×982 and 393×852 (peek 0.1–0.5, tilt derived):
+Concave neighbours are magnified (closer to the camera). The solver searches radii where the neighbour faces the camera
+and stays in front of the near plane; if the requested peek would make the neighbour cover the center card it keeps the
+first radius that clears the center instead. The layout then reports `peekReachable: false` (`data-peek` /
+`data-peek-reachable` on `.cg-cylinder`, the `/dev` readout, a dev-only `console.warn`). Envelope where every peek from
+0.1 to 0.5 is reachable at 1512×982 and 393×852 (default card, tilt derived):
 
 | `minVirtualSlots` | 5 | 8 | 12 (default) | 24 |
 |---|---|---|---|---|
-| max `perspectiveFov` | 30° | 70° | 110° | 130° |
+| max `perspectiveFov` | 55° | 40° | 35° | 45° |
 
 `tiltTopDeg ≠ tiltBottomDeg` solves the radius for the bottom tilt; the top peek then differs slightly.
 
 ## `GalleryItemCard` (spec §5) — `<Gallery card={…} cardAspect>`
+
+The card shell (orbit slot) is **transparent**. The visible placeholder is the media box inside it, whose bounds always
+equal the media currently showing (Figma "Content well").
 
 | Prop | Type | Default | Tag | Notes |
 |---|---|---|---|---|
 | `item` | `GalleryItem` | required | | Supplied by the cylinder. |
 | `slot` | `"top" \| "center" \| "bottom" \| "hidden"` | required | | Supplied by the cylinder (`data-slot`). |
 | `isActive` | `boolean` | | | Settled center only. |
-| `isExpanded` | `boolean` | `false` | | Pauses the stage. |
+| `isExpanded` | `boolean` | `false` | | Stops the cycle (fresh interval on collapse). |
 | `mediaIndex` | `number` | `0` | [FACT] | Frozen frame when inactive; `Gallery` persists it per item. |
 | `aspect` | `"16:9" \| "4:3" \| "1:1"` | current media | | Override via `<Gallery cardAspect>`. |
 | `onExpand` | `() => void` | — | | Standalone use. Inside the cylinder the center click is routed by `CylinderGallery.onCenterClick`. |
-| `width` | CSS length | `min(86vw, calc(48dvh * 4 / 3))` | [OPEN §12.4] | Fixed outer shell. The orbit measures this box. |
-| `height` | CSS length | `min(48dvh, calc(86vw * 3 / 4))` | [OPEN §12.4] | |
-| `borderRadius` | CSS length | `20px` | [OPEN §12.4] | |
-| `padding` | CSS length | `0px` | [OPEN §12.4] | |
-| `background` | CSS color | `#161618` | [OPEN §12.4] | Also the letterbox colour. |
-| `shadow` | CSS box-shadow | `0 30px 80px rgba(0,0,0,0.45)` | [OPEN §12.4] | |
-| `tiltTopDeg` / `tiltBottomDeg` | `number` (deg) | derived | | Derived = orbit angle. A value sets the tilt at the ±1 slot and scales proportionally in between (multiplier = `tiltDeg / spacingDeg`). |
+| `width` | CSS length | `min(calc(46.93dvh * 16 / 9), 86vw)` | [FIGMA] / [OPEN] mobile | Slot = the media's max (16:9) box: 819.2 × 460.8 at 1512×982. |
+| `height` | CSS length | `min(46.93dvh, calc(86vw * 9 / 16))` | [FIGMA] / [OPEN] mobile | The orbit measures this box. |
+| `borderRadius` | CSS length | `var(--radius-4xl)` (32px) | [FIGMA] | Applied to the media box. |
+| `padding` | CSS length | `0px` | | Shell padding. |
+| `background` | CSS color | `transparent` | [FIGMA] | Fill under the media (only visible with transparent media). |
+| `shadow` | CSS box-shadow | `var(--shadow-content-well)` | [FIGMA] | `0 16px 48px rgba(0,0,0,0.35)`. |
+| `tiltTopDeg` / `tiltBottomDeg` | `number` (deg) | derived | | Derived = orbit angle (facing the center). A value sets the tilt at the ±1 slot and scales proportionally in between. |
 
-Tokens become CSS custom properties (`--cg-card-*`) on the gallery root, so any CSS length works (`clamp()`, `dvh`, …).
+Border: Figma `Border/Primary` — 3px inside gradient stroke `#3c3c43 → transparent → #3c3c43` (corner to corner),
+blended with `plus-lighter` (Figma Linear Dodge).
 
 ## `ActiveMediaStage` (spec §5) — `<Gallery media={…}>`
+
+Annex choreography (values from the Figma motion context): each clip springs out from the handoff box to its full size,
+holds, compresses into the next clip's handoff box during the last 150ms, then a **hard** opacity cut. Width/height are
+animated (not scale) so the aspect visibly morphs; the media box is anchored at the slot center and centered by transform
+(CLS 0). Clips are stacked; only the current one is opaque.
 
 | Prop | Type | Default | Tag | Notes |
 |---|---|---|---|---|
 | `assets` | `MediaAsset[]` | required | [FACT] | 3–8 (enforced in Studio). |
-| `intervalMs` | `number` | `3500` | [FACT] | Fresh timer each time the stage starts running (settle, collapse, Space resume). |
-| `paused` | `boolean` | `false` | [FACT] | `Gallery` also pauses on Space, off-viewport (IntersectionObserver ≥ 25 %), hidden tab, expanded. |
-| `bounce` | `{ duration, ease, fromScale }` | `{ 0.45, "back.out(1.7)", 0.94 }` | [ASSUMPTION] / `fromScale` [IMPL] | `scale` on the inner node only (transform-only). |
-| `aspectMorph` | `{ duration, ease }` | `{ 0.45, "power3.inOut" }` | [IMPL] | GSAP Flip on the absolutely positioned frame; outer shell never changes (CLS 0). |
+| `active` | `boolean` | | | Settled center, not expanded. Becoming active starts a fresh interval (spec: timer restarts fresh on collapse). |
+| `intervalMs` | `number` | `3500` | [FACT] | Time per clip (annex uses 4s per clip; the spec locks 3.5s). |
+| `paused` | `boolean` | `false` | [FACT] | Space, the glass pause button, off-viewport (IntersectionObserver ≥ `viewportPauseThreshold`), hidden tab. Freezes the timeline and the active video in place; resume continues. |
+| `bounce` | `{ duration, spring: { decay, frequency, ratio } }` | `{ 0.4, { 7.5258, 8.7987, 0.8553 } }` | [FIGMA] | Entrance spring `1 − e^(−t·decay)(cos(t·frequency) + ratio·sin(t·frequency))`, bounce ≈ 0.35. |
+| `aspectMorph` | `{ duration, ease, insetScale }` | `{ 0.15, [0.5, 0, 1, 1], 405.8 / 460.8 }` | [FIGMA] | Exit compress (`cubic-bezier(.5,0,1,1)`) into the handoff box. Handoff width = `insetScale × min(fullWidth(current), fullWidth(next))`; each clip keeps its own aspect, so the cut never jumps horizontally. `ease` also accepts a GSAP ease string. |
 | `onIndexChange` | `(index, assetKey) => void` | — | | `<Gallery onMediaIndexChange(itemIndex, mediaIndex)>`. |
 | `frozenFrame` | asset `_key` | first asset | [FACT] | Start frame; persisted by `Gallery` when the card leaves center. |
-| `mediaErrorSkipMs` | `number` | `1200` | [ASSUMPTION §10] | Failed media shows poster / solid fallback, then skips after this delay. |
-| `viewportPauseThreshold` | `number` | `0.25` | [IMPL] | `<Gallery media>` only: IntersectionObserver ratio below which the gallery counts as off-viewport. |
-
-Implementation detail: every card hosts one stage instance; only the settled center is `active`. This keeps the same
-`<video>` element alive so leaving the center keeps the exact last frame.
+| `mediaErrorSkipMs` | `number` | `1200` | [ASSUMPTION §10] | Failed media shows poster / fill, then skips after this delay. |
+| `controls` | `boolean` | `true` | [FIGMA] | Glass "Media context": tag (`label` · `description` from the asset) + 40px pause button (video only, center card only). |
+| `onTogglePause` | `() => void` | — | | Pause button. `Gallery` maps it to the same state as Space. |
+| `viewportPauseThreshold` | `number` | `0.25` | [IMPL] | `<Gallery media>` only. |
 
 ## `ExpandShell` (spec §5) — `<Gallery expand={…} expandContent>`
+
+Open: the placeholder grows from the card's media box while the media fades + blurs out (empty placeholder), then the
+copy rises in. Close reverses; the media fades back in just before landing. Interruptions continue from the current
+geometry.
 
 | Prop | Type | Default | Tag | Notes |
 |---|---|---|---|---|
 | `open` | `boolean` | | | Controlled by `Gallery` (Enter / click center). |
-| `onClose` | `() => void` | | [FACT] | Esc; also the `×` button ([OPEN] mobile affordance, see README). |
+| `onClose` | `() => void` | | [FACT] | Esc; also the glass close button ([OPEN] mobile affordance). |
 | `children` | `ReactNode` | `"Soon, check back later"` | [FACT] | `<Gallery expandContent>`. |
 | `scroll` | `"vertical"` | `"vertical"` | [FACT] | Only vertical scroll, only inside the shell. |
-| `flipDurationMs` | `number` | `500` | [ASSUMPTION] | Flip open/close and the cylinder fade. |
-| `flipEase` | GSAP ease string | `"power3.inOut"` | [IMPL] | |
-| — | — | `copyFadeInRatio 0.5`, `copyFadeOutRatio 0.3` | [IMPL] | Copy / × fade as a fraction of `flipDurationMs` (`EXPAND_DEFAULTS`). |
-| `inset` | CSS inset | `max(12px, 3dvh) max(12px, 3vw)` | [OPEN §12.4] | Expanded shell geometry. |
-| `borderRadius` | CSS length | `24px` | [OPEN §12.4] | Flip tweens from the card radius. |
-| `background` | CSS color | `#161618` | [OPEN §12.4] | |
-| `mediaMaxHeight` | CSS length | `70dvh` | [OPEN §12.4] | Expanded media box = asset aspect, capped here. |
+| `flipDurationMs` | `number` | `400` | [ASSUMPTION] → Emil pass (was 500) | Open. |
+| `flipEase` | ease | `[0.32, 0.72, 0, 1]` | [IMPL] | Strong drawer ease-out. |
+| `closeDurationMs` | `number` | `300` | [IMPL] | Exit faster than enter. |
+| `closeEase` | ease | `[0.77, 0, 0.175, 1]` | [IMPL] | On-screen morph → ease-in-out. |
+| `mediaHideMs` / `mediaHideBlurPx` | `number` | `200` / `10` | [IMPL] | Media fade + blur as the placeholder scales up (blur masks the crossfade). |
+| `copyRevealMs` / `copyOffsetPx` / `copyHideMs` | `number` | `200` / `8` / `120` | [IMPL] | Copy + close button reveal after the flip; fast hide on close. |
+| `cylinderFadeOutMs` / `cylinderFadeInMs` | `number` | `200` / `300` | [IMPL] | `<Gallery expand>` only. |
+| `inset` | CSS inset | `max(12px, 3dvh) max(12px, 3vw)` | [OPEN §12.4] | Expanded placeholder geometry. |
+| `borderRadius` | CSS length | `var(--radius-4xl)` | [FIGMA] | Flip tweens from the card radius. |
+| `background` | CSS color | `transparent` | [FIGMA] | Empty placeholder: shadow + border only. |
 
 ## Gestures [IMPL] — `<Gallery gestures={…}>`
 
@@ -127,24 +144,30 @@ Implementation detail: every card hosts one stage instance; only the settled cen
 | `swipeMinVelocity` | `0.35` px/ms | …or a flick faster than this beyond `tapSlopPx`. |
 | `tapSlopPx` | `8` px | Movement below this is a tap (click); above it the click is suppressed. |
 
+`WHEEL_LINE_HEIGHT_PX = 16` converts line-mode wheel deltas (Firefox) to px.
+
 ## Orbit guards [IMPL] — `ORBIT_GUARDS`
 
-`minSlotsFloor 5`, `spacingMin 0.01`, `spacingMax π/2 − 0.01`, `autoFovDeg 30`, `fovMinDeg 1`, `fovMaxDeg 170`,
-`peekRatioMin 0`, `peekRatioMax 0.9`, `renderWindow 2` (DOM slots either side of center), `solverSamples 256`,
-`solverIterations 60`, `solverMaxRadiusFactor 1000` (× viewport height), `peekTolerance 0.005`.
+`minSlotsFloor 5`, `spacingMin 0.01`, `spacingMax π/2 − 0.01`, `autoFovDeg 27`, `fovMinDeg 1`, `fovMaxDeg 170`,
+`peekRatioMin 0`, `peekRatioMax 0.9`, `renderWindow 2` (DOM slots either side of center), `nearPlaneFraction 0.8`
+(cards past this fraction of the camera distance are hidden), `solverSamples 256`, `solverIterations 60`,
+`solverMaxRadiusFactor 1000` (× viewport height), `peekTolerance 0.005`.
+
+## Site chrome — `src/components/site/`
+
+| Component | Figma | Notes |
+|---|---|---|
+| `HomePage` | `591:949` Desktop home page | Gallery + logo (`/brand/logo.svg`, 56px, top 16) + glass **About** pill (56px, bottom 24). Chrome fades out while a card is expanded. |
+| `AboutSheet` | `591:948` About (bottom-sheet) | Glass sheet (Material Ultra Thin + Frost, top radius 24), max width 358 content, `ctas` prop (`{ label, href? }[]`, destinations [OPEN]). Opens with `transform 400ms var(--ease-drawer)`, closes in 250ms; Esc, outside click, focus trap, focus returns to the About pill; locks the gallery. |
 
 ## Keyboard (spec §6)
 
 | Key | Action |
 |---|---|
-| `ArrowDown` / `ArrowUp` | Next / previous (ignored while snapping or expanded) |
+| `ArrowDown` / `ArrowUp` | Next / previous (ignored while snapping, expanded, or while the About sheet is open) |
 | `Enter` | Expand active |
-| `Escape` | Collapse expand (and closes the `/dev` panel) |
-| `Space` | Pause / resume center media + its animations (while expanded, Space scrolls natively) |
+| `Escape` | Collapse expand; closes the About sheet (and the `/dev` panel) |
+| `Space` | Pause / resume center media + its timeline (while expanded, Space scrolls natively) |
 
 Keys act only when focus is on the page body or inside the gallery, so Enter/Space keep their native meaning on any other
 focused control. Form fields, contenteditable and `[data-gallery-ignore-keys]` are always ignored.
-
-Interrupting expand (Esc mid-open, Enter mid-close) continues from the panel's current geometry — no jump.
-
-`WHEEL_LINE_HEIGHT_PX = 16` converts line-mode wheel deltas (Firefox) to px.

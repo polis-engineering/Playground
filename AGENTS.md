@@ -17,3 +17,7 @@ sanity-plugin-mux-input, Vitest. Package manager: pnpm 11.
 - Animation = GSAP (+ Flip). Never drive the same node with Flip and Motion `layoutId`.
 - Media cycle must keep CLS at 0: animate the absolutely positioned `.cg-frame` only; bounce is `scale` on `.cg-frame-inner`.
 - Do not add `prefers-reduced-motion` handling (product decision).
+- Visual values come from Figma (fileKey `Ra39Tjy7Kcf74D4P7EmmJP`, frames `591:949` home, `591:948` About sheet) via the CSS
+  custom properties in `src/app/tokens.css`. Use `get_design_context` / `get_motion_context` before changing layout or motion;
+  keep `data-node-id` on Figma-mapped elements.
+- The visible card is the media box (`.cg-frame`); the orbit slot and card shell stay transparent.
