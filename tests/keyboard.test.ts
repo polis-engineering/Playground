@@ -1,5 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { keyToAction } from "@/lib/gallery/keyboard";
+import { keyToAction, shouldHandleGalleryKey } from "@/lib/gallery/keyboard";
+
+type Fake = { tagName: string; isContentEditable?: boolean; ignore?: boolean };
+const el = ({ tagName, isContentEditable = false, ignore = false }: Fake) =>
+  ({
+    tagName,
+    isContentEditable,
+    closest: (sel: string) => (ignore && sel === "[data-gallery-ignore-keys]" ? {} : null),
+  }) as unknown as EventTarget;
+
+describe("shouldHandleGalleryKey", () => {
+  const inside = el({ tagName: "DIV" });
+  const button = el({ tagName: "BUTTON" });
+  const root = { contains: (t: unknown) => t === inside };
+
+  it("handles keys when focus is on the page body", () => {
+    expect(shouldHandleGalleryKey(el({ tagName: "BODY" }), root)).toBe(true);
+  });
+
+  it("handles keys when focus is inside the gallery", () => {
+    expect(shouldHandleGalleryKey(inside, root)).toBe(true);
+  });
+
+  it("leaves other focused controls alone (native Enter/Space)", () => {
+    expect(shouldHandleGalleryKey(button, root)).toBe(false);
+  });
+
+  it("ignores form fields and opted-out subtrees", () => {
+    expect(shouldHandleGalleryKey(el({ tagName: "INPUT" }), root)).toBe(false);
+    expect(shouldHandleGalleryKey(el({ tagName: "DIV", isContentEditable: true }), root)).toBe(false);
+    expect(shouldHandleGalleryKey(el({ tagName: "BODY", ignore: true }), root)).toBe(false);
+  });
+
+  it("handles keys with no target", () => {
+    expect(shouldHandleGalleryKey(null, root)).toBe(true);
+  });
+});
 
 describe("keyToAction (spec §6)", () => {
   const idle = { expanded: false };

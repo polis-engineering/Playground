@@ -4,8 +4,8 @@ import "./gallery.css";
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { aspectRatio } from "@/lib/gallery/aspect";
 import { CARD_DEFAULTS, CYLINDER_DEFAULTS, EXPAND_DEFAULTS, MEDIA_DEFAULTS } from "@/lib/gallery/defaults";
-import { isEditableTarget, keyToAction } from "@/lib/gallery/keyboard";
-import { mod } from "@/lib/gallery/orbit";
+import { keyToAction, shouldHandleGalleryKey } from "@/lib/gallery/keyboard";
+import { mod, resolveInitialSlot } from "@/lib/gallery/orbit";
 import {
   type AspectMorphConfig,
   type BounceConfig,
@@ -95,20 +95,20 @@ export function Gallery({
   className,
   style,
 }: GalleryProps) {
-  const cyl = withDefaults<typeof CYLINDER_DEFAULTS & Pick<CylinderKnobs, "onActiveChange" | "onSnapSettle">>(
-    CYLINDER_DEFAULTS,
-    cylinder,
-  );
+  const cyl = withDefaults<
+    typeof CYLINDER_DEFAULTS & Pick<CylinderKnobs, "onActiveChange" | "onSnapSettle" | "onLayoutChange">
+  >(CYLINDER_DEFAULTS, cylinder);
   const cardTokens = withDefaults<CardTokens>(CARD_DEFAULTS, card);
   const mediaKnobs = withDefaults<typeof MEDIA_DEFAULTS & { paused: boolean }>({ ...MEDIA_DEFAULTS, paused: false }, media);
   const expandKnobs = withDefaults<typeof EXPAND_DEFAULTS>(EXPAND_DEFAULTS, expand);
+  const viewportPauseThreshold = mediaKnobs.viewportPauseThreshold;
   const count = items.length;
 
   const rootRef = useRef<HTMLDivElement>(null);
   const cylinderWrapRef = useRef<HTMLDivElement>(null);
   const cylinderRef = useRef<CylinderGalleryHandle>(null);
 
-  const [activeIndex, setActiveIndex] = useState(() => mod(Math.round(cyl.initialIndex), count));
+  const [activeIndex, setActiveIndex] = useState(() => mod(resolveInitialSlot(cyl.initialIndex, count, cyl.loop), count));
   const [expanded, setExpanded] = useState(false);
   const [originEl, setOriginEl] = useState<HTMLElement | null>(null);
   const [shellRatio, setShellRatio] = useState<number | undefined>();
@@ -138,7 +138,8 @@ export function Gallery({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || isEditableTarget(e.target)) return;
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!shouldHandleGalleryKey(e.target, rootRef.current)) return;
       const action = keyToAction(e.key, { expanded });
       if (!action || action === "collapse") return;
       e.preventDefault();
@@ -154,15 +155,19 @@ export function Gallery({
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
-    const io = new IntersectionObserver(([entry]) => setInViewport(entry.isIntersecting), { threshold: 0.25 });
+    const io = new IntersectionObserver(([entry]) => setInViewport(entry.isIntersecting), {
+      threshold: viewportPauseThreshold,
+    });
     io.observe(root);
     const onVisibility = () => setDocVisible(document.visibilityState === "visible");
     document.addEventListener("visibilitychange", onVisibility);
+    // A page opened in a background tab starts paused.
+    queueMicrotask(onVisibility);
     return () => {
       io.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, []);
+  }, [viewportPauseThreshold]);
 
   useGSAP(
     () => {
@@ -171,6 +176,7 @@ export function Gallery({
         autoAlpha: expanded ? 0 : 1,
         duration: Math.max(0, expandKnobs.flipDurationMs) / 1000,
         ease: expandKnobs.flipEase,
+        overwrite: true,
       });
     },
     { dependencies: [expanded], scope: rootRef },

@@ -1,3 +1,5 @@
+import { WHEEL_LINE_HEIGHT_PX } from "./defaults";
+
 export type StepperOptions = {
   wheelStepThreshold: number;
   wheelIdleResetMs: number;
@@ -8,10 +10,8 @@ export type StepperOptions = {
 
 export type Step = -1 | 0 | 1;
 
-const LINE_HEIGHT_PX = 16;
-
 export function normalizeWheelDelta(delta: number, deltaMode: number, pageHeight: number) {
-  if (deltaMode === 1) return delta * LINE_HEIGHT_PX;
+  if (deltaMode === 1) return delta * WHEEL_LINE_HEIGHT_PX;
   if (deltaMode === 2) return delta * pageHeight;
   return delta;
 }
