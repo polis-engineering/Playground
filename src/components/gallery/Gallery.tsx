@@ -16,7 +16,7 @@ import {
   withDefaults,
 } from "@/lib/gallery/props";
 import type { StepperOptions } from "@/lib/gallery/stepper";
-import type { GalleryItem } from "@/lib/gallery/types";
+import type { Aspect, GalleryItem } from "@/lib/gallery/types";
 import { gsap, useGSAP } from "@/lib/gsap";
 import { CylinderGallery, type CylinderGalleryHandle, type CylinderGalleryProps } from "./CylinderGallery";
 import { ExpandShell } from "./ExpandShell";
@@ -48,6 +48,8 @@ export type GalleryProps = {
   items: GalleryItem[];
   cylinder?: Partial<CylinderKnobs>;
   card?: CardTokens;
+  /** GalleryItemCard `aspect` override for every card; default = current media aspect. */
+  cardAspect?: Aspect;
   media?: Partial<MediaKnobs>;
   expand?: Partial<ExpandKnobs>;
   gestures?: Partial<StepperOptions>;
@@ -79,6 +81,7 @@ export function Gallery({
   items,
   cylinder,
   card,
+  cardAspect,
   media,
   expand,
   gestures,
@@ -208,6 +211,7 @@ export function Gallery({
                 isActive={isActive}
                 isExpanded={expanded && isActive}
                 mediaIndex={frozen[item._id] ?? 0}
+                aspect={cardAspect}
                 paused={paused}
                 media={mediaKnobs}
                 onMediaIndexChange={(mediaIndex) => {
