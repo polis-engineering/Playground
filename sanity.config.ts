@@ -7,8 +7,8 @@ import { apiVersion, dataset, projectId } from "./src/sanity/env";
 import { schemaTypes } from "./src/sanity/schemaTypes";
 
 export default defineConfig({
-  name: "cylinder-gallery",
-  title: "Cylinder Gallery",
+  name: "agency-site",
+  title: "Polis, Works",
   basePath: "/studio",
   projectId: projectId || "missing-project-id",
   dataset,

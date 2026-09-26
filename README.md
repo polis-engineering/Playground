@@ -1,6 +1,7 @@
-# cylinder-gallery
+# agency-site
 
-Vertical snap cylinder gallery for Polis — Next.js App Router + Sanity (Mux video) + Three.js + GSAP.
+Polis, Works agency site — Next.js App Router + Sanity (Mux video) + Three.js + GSAP. The home page is the vertical snap
+cylinder gallery.
 
 Exactly three slots are visible: the center card face-on and cycling media, the neighbours peeking ~33 % from the top and
 bottom on a Three.js Y-orbit. Scroll down / swipe up / `ArrowDown` steps to the next item, wrapping forever. Click or
@@ -90,9 +91,9 @@ Key decisions (see [`docs/superpowers/specs/2026-09-26-cylinder-gallery-design.m
 
 ## Vercel
 
-Vercel-ready with defaults (framework auto-detected, pnpm via `packageManager`). A Vercel project **`cylinder-gallery`**
+Vercel-ready with defaults (framework auto-detected, pnpm via `packageManager`). A Vercel project **`agency-site`**
 exists in team `polis-engineerings-projects`; it was deployed from this branch through the Vercel API and is **not yet
-Git-connected**. After the repo moves (below): Project → Settings → Git → connect `polis-engineering/cylinder-gallery`
+Git-connected**. After the repo moves (below): Project → Settings → Git → connect `polis-engineering/agency-site`
 so every push gets a preview. Add the Sanity env vars in Project → Settings → Environment Variables.
 
 ## Acceptance checklist (spec §11)
@@ -145,24 +146,24 @@ Spec gaps surfaced during the build (implemented minimally, need sign-off):
 
 ## What's left
 
-- Create `polis-engineering/cylinder-gallery` and move this history there (below); connect the Vercel project to it.
+- Create `polis-engineering/agency-site` and move this history there (below); connect the Vercel project to it.
 - Sanity project id + CORS, Mux credentials in Studio, real content.
 - Cross-browser/device QA (iOS Safari, Firefox, Edge) and real-trackpad tuning of the gesture knobs.
 - Lighthouse pass; design tokens per breakpoint; captions; phase-2 expand content.
 
-## Moving to `polis-engineering/cylinder-gallery`
+## Moving to `polis-engineering/agency-site`
 
 This history was bootstrapped on orphan branches of `polis-engineering/Playground` (`polis/cylinder-gallery-main-b9d6`
 = repo root commit, `polis/cylinder-gallery-slice-b9d6` = this work). It shares no commits with Playground.
 
 ```bash
-gh repo create polis-engineering/cylinder-gallery --private \
-  --description "Vertical snap cylinder gallery (Next.js + Sanity + Three.js + GSAP)"
-git clone --single-branch -b polis/cylinder-gallery-slice-b9d6 https://github.com/polis-engineering/Playground cylinder-gallery
-cd cylinder-gallery
+gh repo create polis-engineering/agency-site --private \
+  --description "Polis, Works agency site (Next.js + Sanity + Three.js + GSAP)"
+git clone --single-branch -b polis/cylinder-gallery-slice-b9d6 https://github.com/polis-engineering/Playground agency-site
+cd agency-site
 git fetch origin polis/cylinder-gallery-main-b9d6
-git remote add gallery https://github.com/polis-engineering/cylinder-gallery.git
-git push gallery origin/polis/cylinder-gallery-main-b9d6:refs/heads/main
-git push gallery HEAD:refs/heads/feat/vertical-slice
+git remote add site https://github.com/polis-engineering/agency-site.git
+git push site origin/polis/cylinder-gallery-main-b9d6:refs/heads/main
+git push site HEAD:refs/heads/feat/vertical-slice
 # open a PR feat/vertical-slice → main, then delete the two Playground branches
 ```

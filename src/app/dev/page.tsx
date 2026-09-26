@@ -3,7 +3,7 @@ import { DevPlayground } from "@/components/dev/DevPlayground";
 import { getGalleryItems } from "@/sanity/getGalleryItems";
 
 export const metadata: Metadata = {
-  title: "Cylinder Gallery — knobs",
+  title: "agency-site — gallery knobs",
   robots: { index: false, follow: false },
 };
 
