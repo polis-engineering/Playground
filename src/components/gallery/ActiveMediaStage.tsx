@@ -106,18 +106,20 @@ export function ActiveMediaStage({
       );
       tweensRef.current = [morph, pop];
     },
-    { dependencies: [index], scope: rootRef },
+    // revertOnUpdate: each advance reverts (jumps to end + clears) the previous morph/pop, so an idle center card
+    // never accumulates animations and a short intervalMs cannot stack two Flips on the frame.
+    { dependencies: [index], scope: rootRef, revertOnUpdate: true },
   );
 
-  const firstIndex = useRef(true);
+  const reportedIndex = useRef(index);
   useEffect(() => {
-    if (firstIndex.current) {
-      firstIndex.current = false;
-      return;
-    }
-    const asset = assets[mod(index, count)];
-    if (asset) onIndexChangeRef.current?.(mod(index, count), asset._key);
-    if (active) preload(assets[mod(index + 1, count)]);
+    if (count === 0 || mod(index, count) === mod(reportedIndex.current, count)) return;
+    reportedIndex.current = index;
+    onIndexChangeRef.current?.(mod(index, count), assets[mod(index, count)]._key);
+  }, [index, assets, count]);
+
+  useEffect(() => {
+    if (active && count > 1) preload(assets[mod(index + 1, count)]);
   }, [index, assets, count, active]);
 
   // Space pauses in-flight bounce/morph; leaving center jumps them to their end frame.
