@@ -1,3 +1,13 @@
-export default function Home() {
-  return <main>Cylinder gallery</main>;
+import { Gallery } from "@/components/gallery/Gallery";
+import { getGalleryItems } from "@/sanity/getGalleryItems";
+
+export const revalidate = 60;
+
+export default async function Home() {
+  const { items, source } = await getGalleryItems();
+  return (
+    <main data-source={source}>
+      <Gallery items={items} ariaLabel="Gallery" />
+    </main>
+  );
 }
