@@ -42,8 +42,26 @@ prop groups:
 | `onSnapSettle` | `(index) => void` | — | | Fires when the snap tween completes. |
 | `className` / `style` | — | — | | Escape hatches. On `<Gallery>` they apply to the root. |
 
-`CylinderGallery` also accepts `renderItem`, `onCenterClick`, `gestures`, `tiltTopDeg`, `tiltBottomDeg`, `ariaLabel` and a
-`ref` exposing `{ step(±1), snapTo(index), activeCardElement(), isSnapping() }`.
+`CylinderGallery` also accepts `renderItem`, `onCenterClick`, `gestures`, `tiltTopDeg`, `tiltBottomDeg`, `ariaLabel`,
+`onLayoutChange(layout)` (solved orbit incl. `peekAchieved` / `peekReachable`) and a `ref` exposing
+`{ step(±1), snapTo(index), activeCardElement(), isSnapping() }`.
+
+With `loop={false}` no wrapped neighbours are rendered at either end, and turning loop off (or shrinking the list)
+re-maps the position to the same item index.
+
+### When `peekRatio` is unreachable
+
+The solver only searches radii where the ±1 neighbour faces the camera. Wide FOVs combined with large spacing turn the
+neighbour edge-on while it is still inside the viewport, so no radius gives the requested peek. The layout then
+reports `peekReachable: false` (also `data-peek` / `data-peek-reachable` on `.cg-cylinder`, the `/dev` readout, and a
+dev-only `console.warn`). It keeps the closest non-overlapping radius, or pushes the neighbours out of view rather than
+over the center card. Tested reachable envelope at 1512×982 and 393×852 (peek 0.1–0.5, tilt derived):
+
+| `minVirtualSlots` | 5 | 8 | 12 (default) | 24 |
+|---|---|---|---|---|
+| max `perspectiveFov` | 30° | 70° | 110° | 130° |
+
+`tiltTopDeg ≠ tiltBottomDeg` solves the radius for the bottom tilt; the top peek then differs slightly.
 
 ## `GalleryItemCard` (spec §5) — `<Gallery card={…} cardAspect>`
 
@@ -78,6 +96,7 @@ Tokens become CSS custom properties (`--cg-card-*`) on the gallery root, so any 
 | `onIndexChange` | `(index, assetKey) => void` | — | | `<Gallery onMediaIndexChange(itemIndex, mediaIndex)>`. |
 | `frozenFrame` | asset `_key` | first asset | [FACT] | Start frame; persisted by `Gallery` when the card leaves center. |
 | `mediaErrorSkipMs` | `number` | `1200` | [ASSUMPTION §10] | Failed media shows poster / solid fallback, then skips after this delay. |
+| `viewportPauseThreshold` | `number` | `0.25` | [IMPL] | `<Gallery media>` only: IntersectionObserver ratio below which the gallery counts as off-viewport. |
 
 Implementation detail: every card hosts one stage instance; only the settled center is `active`. This keeps the same
 `<video>` element alive so leaving the center keeps the exact last frame.
@@ -92,6 +111,7 @@ Implementation detail: every card hosts one stage instance; only the settled cen
 | `scroll` | `"vertical"` | `"vertical"` | [FACT] | Only vertical scroll, only inside the shell. |
 | `flipDurationMs` | `number` | `500` | [ASSUMPTION] | Flip open/close and the cylinder fade. |
 | `flipEase` | GSAP ease string | `"power3.inOut"` | [IMPL] | |
+| — | — | `copyFadeInRatio 0.5`, `copyFadeOutRatio 0.3` | [IMPL] | Copy / × fade as a fraction of `flipDurationMs` (`EXPAND_DEFAULTS`). |
 | `inset` | CSS inset | `max(12px, 3dvh) max(12px, 3vw)` | [OPEN §12.4] | Expanded shell geometry. |
 | `borderRadius` | CSS length | `24px` | [OPEN §12.4] | Flip tweens from the card radius. |
 | `background` | CSS color | `#161618` | [OPEN §12.4] | |
@@ -110,7 +130,8 @@ Implementation detail: every card hosts one stage instance; only the settled cen
 ## Orbit guards [IMPL] — `ORBIT_GUARDS`
 
 `minSlotsFloor 5`, `spacingMin 0.01`, `spacingMax π/2 − 0.01`, `autoFovDeg 30`, `fovMinDeg 1`, `fovMaxDeg 170`,
-`peekRatioMin 0`, `peekRatioMax 0.9`, `renderWindow 2` (DOM slots either side of center), `solverIterations 60`.
+`peekRatioMin 0`, `peekRatioMax 0.9`, `renderWindow 2` (DOM slots either side of center), `solverSamples 256`,
+`solverIterations 60`, `solverMaxRadiusFactor 1000` (× viewport height), `peekTolerance 0.005`.
 
 ## Keyboard (spec §6)
 
@@ -121,4 +142,9 @@ Implementation detail: every card hosts one stage instance; only the settled cen
 | `Escape` | Collapse expand (and closes the `/dev` panel) |
 | `Space` | Pause / resume center media + its animations (while expanded, Space scrolls natively) |
 
-Keys are ignored when focus is in an input/select/textarea/contenteditable or inside `[data-gallery-ignore-keys]`.
+Keys act only when focus is on the page body or inside the gallery, so Enter/Space keep their native meaning on any other
+focused control. Form fields, contenteditable and `[data-gallery-ignore-keys]` are always ignored.
+
+Interrupting expand (Esc mid-open, Enter mid-close) continues from the panel's current geometry — no jump.
+
+`WHEEL_LINE_HEIGHT_PX = 16` converts line-mode wheel deltas (Firefox) to px.

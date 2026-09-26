@@ -48,7 +48,9 @@ them in the dataset.
    `poster` (required for video), `alt`. Studio warns when an image's pixels suggest a different aspect (hint only).
 
 The page fetches on the server (`src/sanity/getGalleryItems.ts`, ISR 60 s) and hands plain data to the client island.
-Fetch errors fall back to mock data; an empty dataset renders the empty state.
+Mock data is used **only** when Sanity is not configured. With Sanity configured, fetch errors propagate: Next keeps
+serving the last good ISR page (a build fails loudly) instead of publishing placeholders. An empty dataset renders the
+empty state.
 
 ## Architecture
 
@@ -107,7 +109,7 @@ mobile 393×852 (touch), plus unit tests.
 | 5 | Leaving center freezes last frame; Space pauses; leaving viewport pauses | ✅ / ◐ | Space verified; frozen frame restored after expand; off-viewport pause implemented (IntersectionObserver + `visibilitychange`), not script-verified |
 | 6 | Enter / click center expands; cylinder hidden + locked; Esc collapses; same item + frozen media; timer restarts fresh | ✅ | Arrows ignored while expanded; same item + media index after Esc; focus returns to card |
 | 7 | Body shows "Soon, check back later"; vertical scroll only inside expand | ✅ | Dialog text verified; `overflow-y: auto` only on the shell |
-| 8 | All §5 props overridable without breaking orbit math | ✅ | 54 solver cases + guard tests; `/dev` knob sweep |
+| 8 | All §5 props overridable without breaking orbit math | ✅ / ◐ | 54 solver cases + a 216-case FOV × `minVirtualSlots` grid: never back-facing or covering the center; `/dev` knob sweep. Some wide-FOV / low-slot combos cannot reach the peek geometrically — reported as `peekReachable: false` (envelope in `docs/props.md`) |
 | 9 | CWV: no CLS from cycle; transform-only bounce; Sanity CDN + sized URLs | ✅ / ◐ | CLS 0; bounce is `scale`; `srcset` with `?w=…&auto=format` (unit tested). Lighthouse not run yet |
 | 10 | Chrome, Safari, Firefox, Edge — desktop + mobile | ◐ | Chrome (desktop + mobile emulation) only; Safari/iOS, Firefox, Edge pending |
 
@@ -126,13 +128,20 @@ Spec gaps surfaced during the build (implemented minimally, need sign-off):
 5. **Mobile collapse:** the spec lists only Esc. A minimal `×` button (aria-label "Close") ships so touch users are not
    trapped in the expanded state.
 6. **Item order:** §8 has no order field → GROQ orders by `_createdAt asc`.
-7. **Keyboard scope:** keys are handled window-wide while the gallery is mounted (skipping form fields and
-   `[data-gallery-ignore-keys]`).
+7. **Keyboard scope:** keys act only when focus is on the page body or inside the gallery (other focused controls keep
+   native Enter/Space; form fields and `[data-gallery-ignore-keys]` are skipped).
 8. **Space resume** restarts the 3.5 s timer fresh (the spec defines fresh restart only for collapse); in-flight
    bounce/morph tweens pause and resume.
 9. **Aspect hint:** Studio's auto-detect warning covers images only (Mux `aspect_ratio` not checked).
 10. [IMPL] defaults not in the spec: `bounce.fromScale 0.94`, `aspectMorph 0.45 s power3.inOut`, auto FOV 30°, gesture
-    thresholds, expand shell tokens.
+    thresholds, expand shell tokens, off-viewport threshold 0.25, copy fade ratios.
+11. **Fetch errors (§10 has no state for it):** with Sanity configured, errors propagate (last good ISR page stays) —
+    never mock content in production.
+12. **Copy outside the spec:** `ariaLabel="Gallery"`, the × `aria-label="Close"`, and the page `<title>`/description are
+    placeholders pending product copy.
+13. **Expanded video** shows its poster (a new element), not the frozen video frame of the card.
+14. **GSAP contexts:** spec §13 asks for one context per gallery; each component uses its own `useGSAP` context (all
+    reverted on unmount) and the snap tween is killed on unmount.
 
 ## What's left
 
