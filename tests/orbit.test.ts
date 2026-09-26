@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ORBIT_GUARDS } from "@/lib/gallery/defaults";
 import {
   clampPosition,
+  computeOrbitLayout,
   mod,
   neighborVisibleFraction,
   perspectiveDistance,
@@ -165,6 +166,54 @@ describe("solveAutoRadius", () => {
     });
     expect(Number.isFinite(r)).toBe(true);
     expect(r).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("computeOrbitLayout", () => {
+  const base = {
+    width: 1512,
+    height: 982,
+    cardHeight: 452,
+    itemCount: 3,
+    peekRatio: 0.33,
+    radius: "auto" as const,
+    minVirtualSlots: 12,
+    perspectiveFov: "auto" as const,
+  };
+
+  it("solves the radius when radius is auto", () => {
+    const l = computeOrbitLayout(base);
+    expect(l.radius).toBeGreaterThan(0);
+    expect(
+      neighborVisibleFraction({
+        viewportHeight: l.height,
+        cardHeight: base.cardHeight,
+        spacing: l.spacing,
+        perspective: l.perspective,
+        tiltMultiplier: 1,
+        radius: l.radius,
+      }),
+    ).toBeCloseTo(0.33, 2);
+  });
+
+  it("uses an explicit radius as-is", () => {
+    expect(computeOrbitLayout({ ...base, radius: 1234 }).radius).toBe(1234);
+  });
+
+  it("guards negative explicit radius", () => {
+    expect(computeOrbitLayout({ ...base, radius: -5 }).radius).toBe(0);
+  });
+
+  it("derives tilt multipliers from tilt degrees", () => {
+    const l = computeOrbitLayout({ ...base, tiltTopDeg: 15, tiltBottomDeg: 60 });
+    expect(l.tiltTopMultiplier).toBeCloseTo(0.5);
+    expect(l.tiltBottomMultiplier).toBeCloseTo(2);
+  });
+
+  it("reports the camera distance matching fov", () => {
+    const l = computeOrbitLayout({ ...base, perspectiveFov: 90 });
+    expect(l.perspective).toBeCloseTo(491);
+    expect(l.fovDeg).toBe(90);
   });
 });
 

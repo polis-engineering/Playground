@@ -11,12 +11,12 @@ export const CYLINDER_DEFAULTS = {
   /** Fraction of the top/bottom card's projected height left visible. */
   peekRatio: 0.33,
   /** "auto" solves the radius from viewport height so the peek equals `peekRatio`. */
-  radius: "auto" as const,
+  radius: "auto" as number | "auto",
   /** `undefined` = derived: 2π / max(N, minVirtualSlots). Radians. */
   itemAngularSpacing: undefined as number | undefined,
   minVirtualSlots: 12,
   /** "auto" = `ORBIT_GUARDS.autoFovDeg`. Number = vertical FOV in degrees (Three.js PerspectiveCamera). */
-  perspectiveFov: "auto" as const,
+  perspectiveFov: "auto" as "auto" | number,
   /** [ASSUMPTION] matches s.page feel. */
   snapDurationMs: 620,
   snapEase: "power4.out",
@@ -78,6 +78,9 @@ export const MEDIA_DEFAULTS = {
   aspectMorph: { duration: 0.45, ease: "power3.inOut" },
   /** [ASSUMPTION §10] media error → fallback, then skip to next asset after this delay. */
   mediaErrorSkipMs: 1200,
+  /** [IMPL] Sanity CDN srcset widths and `sizes` hint (spec §11.9: CDN + sized URLs). */
+  imageWidths: [480, 800, 1200, 1600, 2000],
+  imageSizes: "(max-width: 768px) 90vw, 50vw",
 };
 
 export const EXPAND_DEFAULTS = {
@@ -89,4 +92,9 @@ export const EXPAND_DEFAULTS = {
   scroll: "vertical" as const,
   /** [FACT] phase-1 body copy. */
   placeholder: "Soon, check back later",
+  /** [OPEN §12.4] expanded shell tokens — design pending. */
+  inset: "max(12px, 3dvh) max(12px, 3vw)",
+  borderRadius: "24px",
+  background: "#161618",
+  mediaMaxHeight: "70dvh",
 };

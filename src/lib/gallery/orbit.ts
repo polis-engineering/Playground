@@ -99,6 +99,47 @@ export function solveAutoRadius(a: PeekArgs & { peekRatio: number }) {
   return (lo + hi) / 2;
 }
 
+export type OrbitLayoutInput = {
+  width: number;
+  height: number;
+  cardHeight: number;
+  itemCount: number;
+  peekRatio: number;
+  radius: number | "auto";
+  minVirtualSlots: number;
+  perspectiveFov: "auto" | number;
+  itemAngularSpacing?: number;
+  tiltTopDeg?: number;
+  tiltBottomDeg?: number;
+};
+
+export type OrbitLayout = PoseOptions & {
+  width: number;
+  height: number;
+  fovDeg: number;
+  perspective: number;
+};
+
+export function computeOrbitLayout(i: OrbitLayoutInput): OrbitLayout {
+  const spacing = resolveSpacing(i);
+  const fovDeg = resolveFovDeg(i.perspectiveFov);
+  const perspective = perspectiveDistance(i.height, fovDeg);
+  const tiltTopMultiplier = tiltMultiplier(spacing, i.tiltTopDeg);
+  const tiltBottomMultiplier = tiltMultiplier(spacing, i.tiltBottomDeg);
+  const radius =
+    typeof i.radius === "number" && Number.isFinite(i.radius)
+      ? Math.max(0, i.radius)
+      : solveAutoRadius({
+          viewportHeight: i.height,
+          cardHeight: i.cardHeight,
+          spacing,
+          perspective,
+          peekRatio: i.peekRatio,
+          tiltMultiplier: tiltBottomMultiplier,
+        });
+  return { width: i.width, height: i.height, fovDeg, perspective, radius, spacing, tiltTopMultiplier, tiltBottomMultiplier };
+}
+
 export function clampPosition(pos: number, itemCount: number, loop: boolean) {
   if (loop) return pos;
   return clamp(pos, 0, Math.max(0, itemCount - 1));

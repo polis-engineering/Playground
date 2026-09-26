@@ -1,0 +1,241 @@
+.cg-root {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.cg-cylinder-wrap {
+  position: absolute;
+  inset: 0;
+}
+
+.cg-cylinder {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cg-camera {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.cg-slot,
+.cg-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--cg-card-width);
+  height: var(--cg-card-height);
+}
+
+.cg-slot {
+  visibility: hidden;
+  pointer-events: auto;
+  cursor: pointer;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
+  outline: none;
+}
+
+.cg-slot:focus-visible .cg-card {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 4px;
+}
+
+.cg-measure {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.cg-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--cg-card-radius);
+  padding: var(--cg-card-padding);
+  background: var(--cg-card-bg);
+  box-shadow: var(--cg-card-shadow);
+  overflow: hidden;
+}
+
+/* Fixed outer shell: its box never depends on the media aspect (zero CLS). */
+.cg-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  container-type: size;
+  overflow: hidden;
+}
+
+/*
+ * Media frame: contain-fit of --cg-ratio inside the shell; GSAP Flip animates this node only.
+ * Anchored at the shell center and centered by transform so a size morph never moves its layout
+ * start point (Layout Instability ignores transform changes → zero CLS).
+ */
+.cg-frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(100cqw, calc(100cqh * var(--cg-ratio)));
+  height: min(100cqh, calc(100cqw / var(--cg-ratio)));
+  overflow: hidden;
+}
+
+/* Bounce/pop target: transform only. */
+.cg-frame-inner {
+  width: 100%;
+  height: 100%;
+  will-change: transform;
+}
+
+.cg-media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.cg-media-fallback {
+  width: 100%;
+  height: 100%;
+  background: var(--cg-card-bg);
+}
+
+/* Loading: skeleton in 3 slots, no orbit until ready. */
+.cg-skeleton {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cg-skeleton-block {
+  position: absolute;
+  left: 50%;
+  width: var(--cg-card-width);
+  height: var(--cg-card-height);
+  border-radius: var(--cg-card-radius);
+  background: linear-gradient(100deg, #18181b 20%, #232326 40%, #18181b 60%);
+  background-size: 300% 100%;
+  animation: cg-shimmer 1.4s linear infinite;
+}
+
+.cg-skeleton-block[data-slot="top"] {
+  top: 0;
+  transform: translate(-50%, calc(-100% * (1 - var(--cg-peek))));
+}
+
+.cg-skeleton-block[data-slot="center"] {
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.cg-skeleton-block[data-slot="bottom"] {
+  bottom: 0;
+  transform: translate(-50%, calc(100% * (1 - var(--cg-peek))));
+}
+
+@keyframes cg-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.cg-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+/* Expanded shell */
+.cg-expand {
+  position: fixed;
+  inset: var(--cg-expand-inset);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: var(--cg-expand-bg);
+  border-radius: var(--cg-expand-radius);
+  overflow: hidden;
+}
+
+.cg-expand-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  outline: none;
+  container-type: inline-size;
+}
+
+.cg-expand-media {
+  position: relative;
+  width: 100%;
+  height: min(var(--cg-expand-media-max-h), calc(100cqw / var(--cg-ratio)));
+  container-type: size;
+  background: #000;
+}
+
+.cg-expand-body {
+  padding: clamp(24px, 4vw, 48px);
+  font-size: clamp(18px, 2.2vw, 28px);
+  line-height: 1.3;
+}
+
+.cg-expand-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 160ms ease-out;
+}
+
+.cg-expand-close:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.cg-expand-close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.cg-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
