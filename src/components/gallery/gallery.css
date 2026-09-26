@@ -172,6 +172,7 @@
   background: var(--cg-expand-bg);
   border-radius: var(--cg-expand-radius);
   overflow: hidden;
+  outline: none;
 }
 
 .cg-expand-scroll {
