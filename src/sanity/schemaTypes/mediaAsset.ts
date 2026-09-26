@@ -77,6 +77,16 @@ export const mediaAsset = defineType({
       type: "string",
       validation: (rule) => rule.required(),
     }),
+    defineField({
+      name: "label",
+      description: "Media context tag (glass pill on the card). Optional.",
+      type: "string",
+    }),
+    defineField({
+      name: "description",
+      description: "Media context tag, second part. Optional.",
+      type: "string",
+    }),
   ],
   preview: {
     select: { kind: "kind", aspect: "aspect", alt: "alt", image: "image", poster: "poster" },

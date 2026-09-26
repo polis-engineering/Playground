@@ -1,4 +1,4 @@
-import { createMockItems } from "@/lib/gallery/mock";
+import { createMockItems, type MockOptions } from "@/lib/gallery/mock";
 import type { GalleryItem } from "@/lib/gallery/types";
 import { mapGalleryItems } from "./mapGallery";
 
@@ -11,8 +11,9 @@ export type GallerySource = "sanity" | "mock";
 export async function loadGallery(
   configured: boolean,
   fetchRows: () => Promise<unknown[]>,
+  mockOptions: MockOptions = {},
 ): Promise<{ items: GalleryItem[]; source: GallerySource }> {
-  if (!configured) return { items: createMockItems(), source: "mock" };
+  if (!configured) return { items: createMockItems(3, mockOptions), source: "mock" };
   const rows = await fetchRows();
   return { items: mapGalleryItems(rows), source: "sanity" };
 }

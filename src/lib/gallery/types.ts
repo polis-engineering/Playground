@@ -25,6 +25,9 @@ export type MediaAsset = {
   image?: MediaImage;
   video?: MediaVideo;
   poster?: MediaImage;
+  /** Figma "Media context" tag (glass pill, bottom-right of the card). */
+  label?: string;
+  description?: string;
 };
 
 export type GalleryItem = {

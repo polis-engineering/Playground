@@ -10,6 +10,8 @@ export const GALLERY_QUERY = defineQuery(`*[_type == "galleryItem" && defined(sl
     kind,
     aspect,
     alt,
+    label,
+    description,
     "image": image{ "url": asset->url, "width": asset->metadata.dimensions.width, "height": asset->metadata.dimensions.height, "lqip": asset->metadata.lqip },
     "playbackId": video.asset->playbackId,
     "poster": poster{ "url": asset->url, "width": asset->metadata.dimensions.width, "height": asset->metadata.dimensions.height, "lqip": asset->metadata.lqip }

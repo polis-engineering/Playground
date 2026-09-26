@@ -20,5 +20,5 @@ export function getGalleryItems() {
     });
     const rows = await client.fetch(GALLERY_QUERY, {}, { next: { revalidate: GALLERY_REVALIDATE_SECONDS } });
     return rows as unknown[];
-  });
+  }, { videoBaseUrl: process.env.NEXT_PUBLIC_MOCK_VIDEO_BASE_URL || undefined });
 }

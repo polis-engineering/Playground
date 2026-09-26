@@ -11,6 +11,8 @@ type RawMedia = {
   image?: RawImage;
   playbackId?: string | null;
   poster?: RawImage;
+  label?: string | null;
+  description?: string | null;
 };
 
 type RawItem = { _id?: string; title?: string | null; slug?: string | null; media?: RawMedia[] | null };
@@ -26,6 +28,12 @@ function mapImage(raw: RawImage | undefined): MediaImage | undefined {
   return out;
 }
 
+function withContext(asset: MediaAsset, raw: RawMedia): MediaAsset {
+  if (raw.label) asset.label = raw.label;
+  if (raw.description) asset.description = raw.description;
+  return asset;
+}
+
 function mapMedia(raw: RawMedia, log: (msg: string) => void): MediaAsset | null {
   if (!raw?._key) return null;
   const aspect = parseAspect(raw.aspect, log);
@@ -35,11 +43,11 @@ function mapMedia(raw: RawMedia, log: (msg: string) => void): MediaAsset | null 
     const asset: MediaAsset = { _key: raw._key, kind: "video", aspect, alt, video: { playbackId: raw.playbackId } };
     const poster = mapImage(raw.poster);
     if (poster) asset.poster = poster;
-    return asset;
+    return withContext(asset, raw);
   }
   const image = mapImage(raw.image);
   if (!image) return null;
-  return { _key: raw._key, kind: "image", aspect, alt, image };
+  return withContext({ _key: raw._key, kind: "image", aspect, alt, image }, raw);
 }
 
 export function mapGalleryItems(rows: unknown[], log: (msg: string) => void = defaultLog): GalleryItem[] {

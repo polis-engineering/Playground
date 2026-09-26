@@ -16,7 +16,7 @@ describe("mapGalleryItems", () => {
         title: "Alpha",
         slug: "alpha",
         media: [
-          { _key: "m1", kind: "image", aspect: "4:3", alt: "one", image: img(1200, 900) },
+          { _key: "m1", kind: "image", aspect: "4:3", alt: "one", image: img(1200, 900), label: "Label", description: "Description" },
           { _key: "m2", kind: "video", aspect: "16:9", alt: "two", playbackId: "pb1", poster: img(1600, 900) },
         ],
       },
@@ -33,6 +33,8 @@ describe("mapGalleryItems", () => {
           aspect: "4:3",
           alt: "one",
           image: { ...img(1200, 900), cdn: "sanity" },
+          label: "Label",
+          description: "Description",
         },
         {
           _key: "m2",
