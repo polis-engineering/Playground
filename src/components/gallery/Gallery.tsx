@@ -2,8 +2,8 @@
 
 import "./gallery.css";
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { aspectRatio } from "@/lib/gallery/aspect";
 import { CARD_DEFAULTS, CYLINDER_DEFAULTS, EXPAND_DEFAULTS, MEDIA_DEFAULTS } from "@/lib/gallery/defaults";
+import { toGsapEase } from "@/lib/gallery/easing";
 import { keyToAction, shouldHandleGalleryKey } from "@/lib/gallery/keyboard";
 import { mod, resolveInitialSlot } from "@/lib/gallery/orbit";
 import {
@@ -38,11 +38,8 @@ export type MediaKnobs = {
   paused: boolean;
 };
 
-export type ExpandKnobs = ExpandTokens & {
-  flipDurationMs: number;
-  flipEase: string;
-  scroll: "vertical";
-};
+export type ExpandKnobs = ExpandTokens &
+  Omit<typeof EXPAND_DEFAULTS, "placeholder" | "inset" | "borderRadius" | "background">;
 
 export type GalleryProps = {
   items: GalleryItem[];
@@ -64,18 +61,10 @@ export type GalleryProps = {
   style?: CSSProperties;
 };
 
-function ExpandedMedia({ item, mediaIndex, shellRatio }: { item: GalleryItem; mediaIndex: number; shellRatio?: number }) {
+function ExpandedMedia({ item, mediaIndex }: { item: GalleryItem; mediaIndex: number }) {
   const asset = item.media[mod(mediaIndex, item.media.length)];
   if (!asset) return null;
-  const vars: Record<string, string> = { "--cg-ratio": String(aspectRatio(asset.aspect)) };
-  if (shellRatio) vars["--cg-shell-ratio"] = String(shellRatio);
-  return (
-    <div className="cg-expand-media" style={vars as CSSProperties}>
-      <div className="cg-frame">
-        <MediaView asset={asset} playing={false} eager />
-      </div>
-    </div>
-  );
+  return <MediaView asset={asset} playing={false} eager />;
 }
 
 /** Spec "GalleryPage": cylinder + expand overlay + keyboard (§6) + pause sources. */
@@ -111,7 +100,6 @@ export function Gallery({
   const [activeIndex, setActiveIndex] = useState(() => mod(resolveInitialSlot(cyl.initialIndex, count, cyl.loop), count));
   const [expanded, setExpanded] = useState(false);
   const [originEl, setOriginEl] = useState<HTMLElement | null>(null);
-  const [shellRatio, setShellRatio] = useState<number | undefined>();
   const [userPaused, setUserPaused] = useState(false);
   const [inViewport, setInViewport] = useState(true);
   const [docVisible, setDocVisible] = useState(true);
@@ -123,9 +111,7 @@ export function Gallery({
   const openExpand = useCallback(() => {
     const handle = cylinderRef.current;
     if (expanded || cyl.locked || !handle || handle.isSnapping()) return;
-    const origin = handle.activeCardElement();
-    setOriginEl(origin);
-    setShellRatio(origin && origin.offsetHeight > 0 ? origin.offsetWidth / origin.offsetHeight : undefined);
+    setOriginEl(handle.activeCardElement());
     setExpanded(true);
     onExpandChange?.(true);
   }, [expanded, cyl.locked, onExpandChange]);
@@ -172,10 +158,11 @@ export function Gallery({
   useGSAP(
     () => {
       if (!cylinderWrapRef.current) return;
+      // Out fast as the placeholder takes over; back in while it shrinks home (spec §6: hidden while expanded).
       gsap.to(cylinderWrapRef.current, {
         autoAlpha: expanded ? 0 : 1,
-        duration: Math.max(0, expandKnobs.flipDurationMs) / 1000,
-        ease: expandKnobs.flipEase,
+        duration: Math.max(0, expanded ? expandKnobs.cylinderFadeOutMs : expandKnobs.cylinderFadeInMs) / 1000,
+        ease: toGsapEase([0.23, 1, 0.32, 1]),
         overwrite: true,
       });
     },
@@ -225,6 +212,7 @@ export function Gallery({
                 aspect={cardAspect}
                 paused={paused}
                 media={mediaKnobs}
+                onTogglePause={() => setUserPaused((p) => !p)}
                 onMediaIndexChange={(mediaIndex) => {
                   setFrozen((prev) => ({ ...prev, [item._id]: mediaIndex }));
                   onMediaIndexChange?.(index, mediaIndex);
@@ -241,12 +229,15 @@ export function Gallery({
         label={activeItem?.title}
         flipDurationMs={expandKnobs.flipDurationMs}
         flipEase={expandKnobs.flipEase}
+        closeDurationMs={expandKnobs.closeDurationMs}
+        closeEase={expandKnobs.closeEase}
+        mediaHideMs={expandKnobs.mediaHideMs}
+        mediaHideBlurPx={expandKnobs.mediaHideBlurPx}
+        copyRevealMs={expandKnobs.copyRevealMs}
+        copyOffsetPx={expandKnobs.copyOffsetPx}
+        copyHideMs={expandKnobs.copyHideMs}
         scroll={expandKnobs.scroll}
-        media={
-          activeItem ? (
-            <ExpandedMedia item={activeItem} mediaIndex={frozen[activeItem._id] ?? 0} shellRatio={shellRatio} />
-          ) : null
-        }
+        media={activeItem ? <ExpandedMedia item={activeItem} mediaIndex={frozen[activeItem._id] ?? 0} /> : null}
       >
         {expandContent ?? expandKnobs.placeholder}
       </ExpandShell>

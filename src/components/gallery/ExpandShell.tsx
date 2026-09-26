@@ -2,6 +2,7 @@
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { EXPAND_DEFAULTS } from "@/lib/gallery/defaults";
+import { type EaseValue, toGsapEase } from "@/lib/gallery/easing";
 import { Flip, gsap, useGSAP } from "@/lib/gsap";
 
 export type ExpandShellProps = {
@@ -13,12 +14,19 @@ export type ExpandShellProps = {
   /** Only "vertical" (spec §5). */
   scroll?: "vertical";
   flipDurationMs?: number;
-  flipEase?: string;
-  /** Card to Flip from on open and back to on close; focus returns here. */
+  flipEase?: EaseValue;
+  closeDurationMs?: number;
+  closeEase?: EaseValue;
+  mediaHideMs?: number;
+  mediaHideBlurPx?: number;
+  copyRevealMs?: number;
+  copyOffsetPx?: number;
+  copyHideMs?: number;
+  /** Card slot to Flip from/to (its visible media box is used); focus returns here. */
   originElement?: HTMLElement | null;
   /** Accessible name of the dialog (item title). */
   label?: string;
-  /** Active item media, scaled up. Rendered above the body inside the scroll area. */
+  /** The card's current media; fills the placeholder while it grows, then fades out (empty placeholder). */
   media?: ReactNode;
   onClosed?: () => void;
 };
@@ -26,14 +34,16 @@ export type ExpandShellProps = {
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),video[controls],[contenteditable="true"],[tabindex]:not([tabindex="-1"])';
 
-function originRadius(origin: HTMLElement) {
-  const card = origin.querySelector<HTMLElement>(".cg-card") ?? origin;
-  return getComputedStyle(card).borderRadius;
+const FADE_EASE: EaseValue = [0.23, 1, 0.32, 1];
+
+/** The visible placeholder of a card slot (media box), falling back to the slot itself. */
+function flipTarget(origin: HTMLElement) {
+  return origin.querySelector<HTMLElement>(".cg-frame") ?? origin;
 }
 
 /**
- * Expand (spec §7): Flip from the active card to the full shell, then reveal the body; reverse on close.
- * Uses Flip.fit so the origin can live inside the 3D orbit (bounds are measured, never re-parented).
+ * Expand (spec §7): Flip from the active card's media box to the full placeholder while the media fades out, then reveal
+ * the body; reverse on close. Flip.fit measures bounds, so the origin can live inside the 3D orbit.
  */
 export function ExpandShell({
   open,
@@ -42,6 +52,13 @@ export function ExpandShell({
   scroll = EXPAND_DEFAULTS.scroll,
   flipDurationMs = EXPAND_DEFAULTS.flipDurationMs,
   flipEase = EXPAND_DEFAULTS.flipEase,
+  closeDurationMs = EXPAND_DEFAULTS.closeDurationMs,
+  closeEase = EXPAND_DEFAULTS.closeEase,
+  mediaHideMs = EXPAND_DEFAULTS.mediaHideMs,
+  mediaHideBlurPx = EXPAND_DEFAULTS.mediaHideBlurPx,
+  copyRevealMs = EXPAND_DEFAULTS.copyRevealMs,
+  copyOffsetPx = EXPAND_DEFAULTS.copyOffsetPx,
+  copyHideMs = EXPAND_DEFAULTS.copyHideMs,
   originElement,
   label,
   media,
@@ -51,9 +68,11 @@ export function ExpandShell({
   if (open && !mounted) setMounted(true);
 
   const panelRef = useRef<HTMLDivElement>(null);
+  const mediaRef = useRef<HTMLDivElement>(null);
   const copyRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const flipRef = useRef<gsap.core.Animation | null>(null);
   const onCloseRef = useRef(onClose);
   const onClosedRef = useRef(onClosed);
   useEffect(() => {
@@ -61,77 +80,89 @@ export function ExpandShell({
     onClosedRef.current = onClosed;
   });
 
-  const flipRef = useRef<gsap.core.Animation | null>(null);
-
   useGSAP(
     () => {
       const panel = panelRef.current;
+      const mediaEl = mediaRef.current;
       const copy = copyRef.current;
-      const scroll = scrollRef.current;
+      const scrollEl = scrollRef.current;
       const close = closeRef.current;
-      if (!mounted || !panel || !copy || !scroll || !close) return;
-      const duration = Math.max(0, flipDurationMs) / 1000;
+      if (!mounted || !panel || !mediaEl || !copy || !scrollEl || !close) return;
+      const s = (ms: number) => Math.max(0, ms) / 1000;
       const origin = originElement?.isConnected ? originElement : null;
+      const target = origin ? flipTarget(origin) : null;
+      const radius = target ? getComputedStyle(target).borderRadius : undefined;
+      const fade = toGsapEase(FADE_EASE);
 
       // Interrupting (Esc mid-open, Enter mid-close) continues from the panel's current geometry: the running flip is
       // killed, never reverted, so nothing snaps to its start or end first.
       const interrupted = Boolean(flipRef.current?.isActive());
       flipRef.current?.kill();
       flipRef.current = null;
-      gsap.killTweensOf([copy, close]);
-
-      // Media rides along with the Flip (it is the card, scaled up); only the copy waits for the flip (spec §7.4).
+      gsap.killTweensOf([copy, close, mediaEl]);
       // No scrollbar while the panel is smaller than its content mid-flip.
-      gsap.set(scroll, { overflowY: "hidden" });
+      gsap.set(scrollEl, { overflowY: "hidden" });
 
       if (open) {
         panel.focus({ preventScroll: true });
         if (!interrupted) {
-          gsap.set(copy, { autoAlpha: 0 });
+          gsap.set(copy, { autoAlpha: 0, y: copyOffsetPx });
           gsap.set(close, { opacity: 0 });
+          gsap.set(mediaEl, { opacity: 1, filter: "blur(0px)" });
         }
+        gsap.to(mediaEl, { opacity: 0, filter: `blur(${mediaHideBlurPx}px)`, duration: s(mediaHideMs), ease: fade });
         const reveal = () => {
           flipRef.current = null;
-          gsap.set(scroll, { clearProps: "overflowY" });
-          gsap.to(copy, { autoAlpha: 1, duration: duration * EXPAND_DEFAULTS.copyFadeInRatio });
+          gsap.set(scrollEl, { clearProps: "overflowY" });
+          gsap.to(copy, { autoAlpha: 1, y: 0, duration: s(copyRevealMs), ease: fade });
           // opacity only: autoAlpha's first frame (visibility: hidden) would blur the focused button.
-          gsap.to(close, { opacity: 1, duration: duration * EXPAND_DEFAULTS.copyFadeInRatio });
+          gsap.to(close, { opacity: 1, duration: s(copyRevealMs), ease: fade });
           close.focus({ preventScroll: true });
         };
+        const duration = s(flipDurationMs);
+        const ease = toGsapEase(flipEase);
         if (interrupted) {
           const state = Flip.getState(panel, { props: "borderRadius" });
           gsap.set(panel, { clearProps: "all" });
-          flipRef.current = Flip.from(state, { duration, ease: flipEase, onComplete: reveal });
-        } else if (origin) {
-          flipRef.current = Flip.fit(panel, origin, {
+          flipRef.current = Flip.from(state, { duration, ease, onComplete: reveal });
+        } else if (target) {
+          flipRef.current = Flip.fit(panel, target, {
             duration,
-            ease: flipEase,
+            ease,
             runBackwards: true,
-            borderRadius: originRadius(origin),
+            borderRadius: radius,
             onComplete: reveal,
           }) as gsap.core.Tween | null;
         } else {
-          flipRef.current = gsap.fromTo(panel, { autoAlpha: 0 }, { autoAlpha: 1, duration, ease: flipEase, onComplete: reveal });
+          flipRef.current = gsap.fromTo(panel, { autoAlpha: 0 }, { autoAlpha: 1, duration, ease, onComplete: reveal });
         }
         return;
       }
 
+      const duration = s(closeDurationMs);
       const finish = () => {
         flipRef.current = null;
         setMounted(false);
         origin?.focus({ preventScroll: true });
         onClosedRef.current?.();
       };
-      gsap.to(copy, { autoAlpha: 0, duration: duration * EXPAND_DEFAULTS.copyFadeOutRatio });
-      gsap.to(close, { opacity: 0, duration: duration * EXPAND_DEFAULTS.copyFadeOutRatio });
-      flipRef.current = origin
-        ? (Flip.fit(panel, origin, {
+      gsap.to(copy, { autoAlpha: 0, y: copyOffsetPx / 2, duration: s(copyHideMs), ease: fade });
+      gsap.to(close, { opacity: 0, duration: s(copyHideMs), ease: fade });
+      gsap.to(mediaEl, {
+        opacity: 1,
+        filter: "blur(0px)",
+        duration: Math.min(s(mediaHideMs), duration),
+        delay: Math.max(0, duration - s(mediaHideMs)),
+        ease: fade,
+      });
+      flipRef.current = target
+        ? (Flip.fit(panel, target, {
             duration,
-            ease: flipEase,
-            borderRadius: originRadius(origin),
+            ease: toGsapEase(closeEase),
+            borderRadius: radius,
             onComplete: finish,
           }) as gsap.core.Tween | null)
-        : gsap.to(panel, { autoAlpha: 0, duration, ease: flipEase, onComplete: finish });
+        : gsap.to(panel, { autoAlpha: 0, duration, ease: toGsapEase(closeEase), onComplete: finish });
     },
     { dependencies: [open, mounted] },
   );
@@ -175,11 +206,14 @@ export function ExpandShell({
       data-scroll={scroll}
       data-state={open ? "open" : "closing"}
     >
-      <button ref={closeRef} type="button" className="cg-expand-close" aria-label="Close" onClick={onClose}>
-        <span aria-hidden>×</span>
+      <div ref={mediaRef} className="cg-expand-media" aria-hidden>
+        {media}
+      </div>
+      <button ref={closeRef} type="button" className="cg-expand-close cg-glass cg-pressable" aria-label="Close" onClick={onClose}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- static Figma icon, fixed 24px box */}
+        <img src="/icons/close.svg" width={24} height={24} alt="" />
       </button>
       <div ref={scrollRef} className="cg-expand-scroll" tabIndex={0}>
-        {media}
         <div ref={copyRef} className="cg-expand-body">
           {children}
         </div>
