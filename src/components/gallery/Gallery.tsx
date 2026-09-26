@@ -64,11 +64,13 @@ export type GalleryProps = {
   style?: CSSProperties;
 };
 
-function ExpandedMedia({ item, mediaIndex }: { item: GalleryItem; mediaIndex: number }) {
+function ExpandedMedia({ item, mediaIndex, shellRatio }: { item: GalleryItem; mediaIndex: number; shellRatio?: number }) {
   const asset = item.media[mod(mediaIndex, item.media.length)];
   if (!asset) return null;
+  const vars: Record<string, string> = { "--cg-ratio": String(aspectRatio(asset.aspect)) };
+  if (shellRatio) vars["--cg-shell-ratio"] = String(shellRatio);
   return (
-    <div className="cg-expand-media" style={{ "--cg-ratio": String(aspectRatio(asset.aspect)) } as CSSProperties}>
+    <div className="cg-expand-media" style={vars as CSSProperties}>
       <div className="cg-frame">
         <MediaView asset={asset} playing={false} eager />
       </div>
@@ -109,6 +111,7 @@ export function Gallery({
   const [activeIndex, setActiveIndex] = useState(() => mod(Math.round(cyl.initialIndex), count));
   const [expanded, setExpanded] = useState(false);
   const [originEl, setOriginEl] = useState<HTMLElement | null>(null);
+  const [shellRatio, setShellRatio] = useState<number | undefined>();
   const [userPaused, setUserPaused] = useState(false);
   const [inViewport, setInViewport] = useState(true);
   const [docVisible, setDocVisible] = useState(true);
@@ -120,7 +123,9 @@ export function Gallery({
   const openExpand = useCallback(() => {
     const handle = cylinderRef.current;
     if (expanded || cyl.locked || !handle || handle.isSnapping()) return;
-    setOriginEl(handle.activeCardElement());
+    const origin = handle.activeCardElement();
+    setOriginEl(origin);
+    setShellRatio(origin && origin.offsetHeight > 0 ? origin.offsetWidth / origin.offsetHeight : undefined);
     setExpanded(true);
     onExpandChange?.(true);
   }, [expanded, cyl.locked, onExpandChange]);
@@ -231,7 +236,11 @@ export function Gallery({
         flipDurationMs={expandKnobs.flipDurationMs}
         flipEase={expandKnobs.flipEase}
         scroll={expandKnobs.scroll}
-        media={activeItem ? <ExpandedMedia item={activeItem} mediaIndex={frozen[activeItem._id] ?? 0} /> : null}
+        media={
+          activeItem ? (
+            <ExpandedMedia item={activeItem} mediaIndex={frozen[activeItem._id] ?? 0} shellRatio={shellRatio} />
+          ) : null
+        }
       >
         {expandContent ?? expandKnobs.placeholder}
       </ExpandShell>

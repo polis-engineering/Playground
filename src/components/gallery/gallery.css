@@ -188,7 +188,8 @@
 .cg-expand-media {
   position: relative;
   width: 100%;
-  height: min(var(--cg-expand-media-max-h), calc(100cqw / var(--cg-ratio)));
+  /* Same ratio as the card shell, so the first Flip frame matches the card exactly. */
+  height: min(var(--cg-expand-media-max-h), calc(100cqw / var(--cg-shell-ratio, var(--cg-ratio))));
   container-type: size;
   background: #000;
 }
