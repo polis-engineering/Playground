@@ -11,6 +11,7 @@ import {
   MEDIA_DEFAULTS,
 } from "@/lib/gallery/defaults";
 import { createMockItems } from "@/lib/gallery/mock";
+import type { EaseValue } from "@/lib/gallery/easing";
 import { ASPECTS, type Aspect, type GalleryItem } from "@/lib/gallery/types";
 import { AutoNumberKnob, BoolKnob, Locked, NumberKnob, RangeKnob, Section, SelectKnob, TextKnob } from "./knobs";
 
@@ -31,7 +32,7 @@ function initialState() {
       loop: CYLINDER_DEFAULTS.loop,
       locked: CYLINDER_DEFAULTS.locked,
       className: "",
-      styleBackground: "#0b0b0c",
+      styleBackground: "var(--backgrounds-primary)",
     },
     card: {
       width: CARD_DEFAULTS.width,
@@ -48,19 +49,29 @@ function initialState() {
       intervalMs: MEDIA_DEFAULTS.intervalMs,
       paused: false,
       bounceDuration: MEDIA_DEFAULTS.bounce.duration,
-      bounceEase: MEDIA_DEFAULTS.bounce.ease,
-      bounceFromScale: MEDIA_DEFAULTS.bounce.fromScale,
+      springDecay: MEDIA_DEFAULTS.bounce.spring.decay,
+      springFrequency: MEDIA_DEFAULTS.bounce.spring.frequency,
+      springRatio: MEDIA_DEFAULTS.bounce.spring.ratio,
       morphDuration: MEDIA_DEFAULTS.aspectMorph.duration,
-      morphEase: MEDIA_DEFAULTS.aspectMorph.ease,
+      morphEase: easeToText(MEDIA_DEFAULTS.aspectMorph.ease),
+      insetScale: MEDIA_DEFAULTS.aspectMorph.insetScale,
       mediaErrorSkipMs: MEDIA_DEFAULTS.mediaErrorSkipMs,
     },
     expand: {
       flipDurationMs: EXPAND_DEFAULTS.flipDurationMs,
-      flipEase: EXPAND_DEFAULTS.flipEase,
+      flipEase: easeToText(EXPAND_DEFAULTS.flipEase),
+      closeDurationMs: EXPAND_DEFAULTS.closeDurationMs,
+      closeEase: easeToText(EXPAND_DEFAULTS.closeEase),
+      mediaHideMs: EXPAND_DEFAULTS.mediaHideMs,
+      mediaHideBlurPx: EXPAND_DEFAULTS.mediaHideBlurPx,
+      copyRevealMs: EXPAND_DEFAULTS.copyRevealMs,
+      copyOffsetPx: EXPAND_DEFAULTS.copyOffsetPx,
+      copyHideMs: EXPAND_DEFAULTS.copyHideMs,
+      cylinderFadeOutMs: EXPAND_DEFAULTS.cylinderFadeOutMs,
+      cylinderFadeInMs: EXPAND_DEFAULTS.cylinderFadeInMs,
       inset: EXPAND_DEFAULTS.inset,
       borderRadius: EXPAND_DEFAULTS.borderRadius,
       background: EXPAND_DEFAULTS.background,
-      mediaMaxHeight: EXPAND_DEFAULTS.mediaMaxHeight,
       children: EXPAND_DEFAULTS.placeholder,
     },
     gestures: { ...GESTURE_DEFAULTS },
@@ -68,6 +79,16 @@ function initialState() {
 }
 
 type DevState = ReturnType<typeof initialState>;
+
+function easeToText(ease: EaseValue) {
+  return typeof ease === "string" ? ease : ease.join(", ");
+}
+
+/** "0.5, 0, 1, 1" → cubic-bezier tuple; anything else is passed to GSAP as an ease string. */
+function textToEase(text: string): EaseValue {
+  const parts = text.split(",").map((p) => Number(p.trim()));
+  return parts.length === 4 && parts.every(Number.isFinite) ? (parts as unknown as EaseValue) : text.trim();
+}
 
 const time = () => new Date().toISOString().slice(14, 23);
 
@@ -92,7 +113,10 @@ export function DevPlayground({ serverItems, source }: { serverItems: GalleryIte
   }, [readout.expanded]);
 
   const items = useMemo(
-    () => (s.data.source === "mock" ? createMockItems(s.data.mockCount) : serverItems),
+    () =>
+      s.data.source === "mock"
+        ? createMockItems(s.data.mockCount, { videoBaseUrl: process.env.NEXT_PUBLIC_MOCK_VIDEO_BASE_URL || undefined })
+        : serverItems,
     [s.data.source, s.data.mockCount, serverItems],
   );
 
@@ -124,17 +148,29 @@ export function DevPlayground({ serverItems, source }: { serverItems: GalleryIte
     media: {
       intervalMs: s.media.intervalMs,
       paused: s.media.paused,
-      bounce: { duration: s.media.bounceDuration, ease: s.media.bounceEase, fromScale: s.media.bounceFromScale },
-      aspectMorph: { duration: s.media.morphDuration, ease: s.media.morphEase },
+      bounce: {
+        duration: s.media.bounceDuration,
+        spring: { decay: s.media.springDecay, frequency: s.media.springFrequency, ratio: s.media.springRatio },
+      },
+      aspectMorph: { duration: s.media.morphDuration, ease: textToEase(s.media.morphEase), insetScale: s.media.insetScale },
       mediaErrorSkipMs: s.media.mediaErrorSkipMs,
     },
     expand: {
       flipDurationMs: s.expand.flipDurationMs,
-      flipEase: s.expand.flipEase,
+      flipEase: textToEase(s.expand.flipEase),
+      closeDurationMs: s.expand.closeDurationMs,
+      closeEase: textToEase(s.expand.closeEase),
+      mediaHideMs: s.expand.mediaHideMs,
+      mediaHideBlurPx: s.expand.mediaHideBlurPx,
+      copyRevealMs: s.expand.copyRevealMs,
+      copyOffsetPx: s.expand.copyOffsetPx,
+      copyHideMs: s.expand.copyHideMs,
+      cylinderFadeOutMs: s.expand.cylinderFadeOutMs,
+      cylinderFadeInMs: s.expand.cylinderFadeInMs,
+      scroll: "vertical",
       inset: s.expand.inset,
       borderRadius: s.expand.borderRadius,
       background: s.expand.background,
-      mediaMaxHeight: s.expand.mediaMaxHeight,
     },
     expandContent: s.expand.children,
     gestures: s.gestures,
@@ -268,22 +304,32 @@ export function DevPlayground({ serverItems, source }: { serverItems: GalleryIte
           <Section title="ActiveMediaStage">
             <NumberKnob label="intervalMs" value={s.media.intervalMs} min={100} max={20000} step={100} onChange={(intervalMs) => set("media", { intervalMs })} />
             <BoolKnob label="paused" hint="Space toggles too" value={s.media.paused} onChange={(paused) => set("media", { paused })} />
-            <NumberKnob label="bounce.duration" hint="s" value={s.media.bounceDuration} min={0} max={3} step={0.05} onChange={(bounceDuration) => set("media", { bounceDuration })} />
-            <TextKnob label="bounce.ease" value={s.media.bounceEase} onChange={(bounceEase) => set("media", { bounceEase })} />
-            <NumberKnob label="bounce.fromScale" value={s.media.bounceFromScale} min={0} max={2} step={0.01} onChange={(bounceFromScale) => set("media", { bounceFromScale })} />
-            <NumberKnob label="aspectMorph.duration" hint="s" value={s.media.morphDuration} min={0} max={3} step={0.05} onChange={(morphDuration) => set("media", { morphDuration })} />
-            <TextKnob label="aspectMorph.ease" value={s.media.morphEase} onChange={(morphEase) => set("media", { morphEase })} />
+            <NumberKnob label="bounce.duration" hint="entrance spring, s" value={s.media.bounceDuration} min={0} max={3} step={0.05} onChange={(bounceDuration) => set("media", { bounceDuration })} />
+            <NumberKnob label="bounce.spring.decay" value={s.media.springDecay} min={0} step={0.1} onChange={(springDecay) => set("media", { springDecay })} />
+            <NumberKnob label="bounce.spring.frequency" value={s.media.springFrequency} min={0} step={0.1} onChange={(springFrequency) => set("media", { springFrequency })} />
+            <NumberKnob label="bounce.spring.ratio" value={s.media.springRatio} min={0} step={0.01} onChange={(springRatio) => set("media", { springRatio })} />
+            <NumberKnob label="aspectMorph.duration" hint="exit compress, s" value={s.media.morphDuration} min={0} max={3} step={0.01} onChange={(morphDuration) => set("media", { morphDuration })} />
+            <TextKnob label="aspectMorph.ease" hint="GSAP ease or x1, y1, x2, y2" value={s.media.morphEase} onChange={(morphEase) => set("media", { morphEase })} />
+            <NumberKnob label="aspectMorph.insetScale" hint="handoff box" value={s.media.insetScale} min={0.1} max={1} step={0.01} onChange={(insetScale) => set("media", { insetScale })} />
             <NumberKnob label="mediaErrorSkipMs" value={s.media.mediaErrorSkipMs} min={0} max={10000} step={100} onChange={(mediaErrorSkipMs) => set("media", { mediaErrorSkipMs })} />
           </Section>
 
           <Section title="ExpandShell">
-            <NumberKnob label="flipDurationMs" value={s.expand.flipDurationMs} min={0} max={3000} step={10} onChange={(flipDurationMs) => set("expand", { flipDurationMs })} />
-            <TextKnob label="flipEase" value={s.expand.flipEase} onChange={(flipEase) => set("expand", { flipEase })} />
+            <NumberKnob label="flipDurationMs" hint="open" value={s.expand.flipDurationMs} min={0} max={3000} step={10} onChange={(flipDurationMs) => set("expand", { flipDurationMs })} />
+            <TextKnob label="flipEase" hint="GSAP ease or x1, y1, x2, y2" value={s.expand.flipEase} onChange={(flipEase) => set("expand", { flipEase })} />
+            <NumberKnob label="closeDurationMs" value={s.expand.closeDurationMs} min={0} max={3000} step={10} onChange={(closeDurationMs) => set("expand", { closeDurationMs })} />
+            <TextKnob label="closeEase" value={s.expand.closeEase} onChange={(closeEase) => set("expand", { closeEase })} />
+            <NumberKnob label="mediaHideMs" value={s.expand.mediaHideMs} min={0} max={2000} step={10} onChange={(mediaHideMs) => set("expand", { mediaHideMs })} />
+            <NumberKnob label="mediaHideBlurPx" value={s.expand.mediaHideBlurPx} min={0} max={20} step={1} onChange={(mediaHideBlurPx) => set("expand", { mediaHideBlurPx })} />
+            <NumberKnob label="copyRevealMs" value={s.expand.copyRevealMs} min={0} max={2000} step={10} onChange={(copyRevealMs) => set("expand", { copyRevealMs })} />
+            <NumberKnob label="copyOffsetPx" value={s.expand.copyOffsetPx} min={0} max={40} step={1} onChange={(copyOffsetPx) => set("expand", { copyOffsetPx })} />
+            <NumberKnob label="copyHideMs" value={s.expand.copyHideMs} min={0} max={2000} step={10} onChange={(copyHideMs) => set("expand", { copyHideMs })} />
+            <NumberKnob label="cylinderFadeOutMs" value={s.expand.cylinderFadeOutMs} min={0} max={2000} step={10} onChange={(cylinderFadeOutMs) => set("expand", { cylinderFadeOutMs })} />
+            <NumberKnob label="cylinderFadeInMs" value={s.expand.cylinderFadeInMs} min={0} max={2000} step={10} onChange={(cylinderFadeInMs) => set("expand", { cylinderFadeInMs })} />
             <Locked label="scroll" value="vertical" />
             <TextKnob label="inset" value={s.expand.inset} onChange={(inset) => set("expand", { inset })} />
             <TextKnob label="borderRadius" value={s.expand.borderRadius} onChange={(borderRadius) => set("expand", { borderRadius })} />
             <TextKnob label="background" value={s.expand.background} onChange={(background) => set("expand", { background })} />
-            <TextKnob label="mediaMaxHeight" value={s.expand.mediaMaxHeight} onChange={(mediaMaxHeight) => set("expand", { mediaMaxHeight })} />
             <TextKnob label="children" hint="phase 1 = placeholder" value={s.expand.children} onChange={(children) => set("expand", { children })} />
           </Section>
 
